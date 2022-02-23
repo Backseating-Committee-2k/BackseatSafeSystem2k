@@ -9,13 +9,17 @@
 //! | `0003 RR__ AAAA AAAA` | move the contents of register R into memory at address A |
 //! | `0004 TTPP ____ ____` | move the contents addressed by the value of register P into register T |
 //! | `0005 PPSS ____ ____` | move the contents of register S into memory at address specified by register P |
+//! | `0006 ____ ____ ____` | halt and catch fire |
 
 mod machine;
 mod memory;
 mod processor;
 mod terminal;
 
+use std::{error::Error, path::Path};
+
 use machine::Machine;
+use processor::Processor;
 use raylib::prelude::*;
 
 pub struct Size2D {
@@ -28,7 +32,9 @@ pub const SCREEN_SIZE: Size2D = Size2D {
     height: 900,
 };
 
-const fn static_assert(condition: bool) {
+pub const OPCODE_LENGTH: usize = 16;
+
+pub const fn static_assert(condition: bool) {
     assert!(condition);
 }
 
@@ -68,7 +74,6 @@ impl Size for Word {}
 impl Size for HalfWord {}
 
 fn save_instructions(machine: &mut Machine, instructions: &[Instruction]) {
-    use processor::Processor;
     let mut address = Processor::ENTRY_POINT;
     for &instruction in instructions {
         machine.memory.write_instruction(address, instruction);
@@ -76,7 +81,23 @@ fn save_instructions(machine: &mut Machine, instructions: &[Instruction]) {
     }
 }
 
-fn main() {
+fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+    let buffer = std::fs::read(filename)?;
+    if buffer.len() % Instruction::SIZE != 0 {
+        return Err(format!("Filesize must be divisible by {}", Instruction::SIZE).into());
+    }
+    let iterator = buffer
+        .chunks_exact(Instruction::SIZE)
+        .map(|slice| Instruction::from_be_bytes(slice.try_into().unwrap()));
+    for (instruction, address) in
+        iterator.zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
+    {
+        machine.memory.write_instruction(address, instruction);
+    }
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
     let (mut raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
@@ -85,48 +106,23 @@ fn main() {
     let font = raylib_handle
         .load_font(&thread, "./resources/CozetteVector.ttf")
         .expect("Could not load font");
-    /*let text = "MMMM";
-    let value = u32::from_be_bytes(text.as_bytes().try_into().unwrap());
-    machine
-        .memory
-        .fill(0..(terminal::WIDTH * terminal::HEIGHT) as Address, value);
-    machine.memory.write_data(
-        4 * 12,
-        u32::from_be_bytes("llll".as_bytes().try_into().unwrap()),
-    );*/
-    let instructions = &[
-        0x0000AA0000000048,
-        0x0003AA0000000000,
-        0x0000AA0000000065,
-        0x0003AA0000000004,
-        0x0000AA000000006c,
-        0x0003AA0000000008,
-        0x0000AA000000006c,
-        0x0003AA000000000C,
-        0x0000AA000000006f,
-        0x0003AA0000000010,
-        0x0000AA0000000020,
-        0x0003AA0000000014,
-        0x0000AA0000000057,
-        0x0003AA0000000018,
-        0x0000AA000000006f,
-        0x0003AA000000001C,
-        0x0000AA0000000072,
-        0x0003AA0000000020,
-        0x0000AA000000006c,
-        0x0003AA0000000024,
-        0x0000AA0000000064,
-        0x0003AA0000000028,
-    ];
-    save_instructions(&mut machine, instructions);
-    for _ in 0..instructions.len() {
-        machine.make_tick();
-    }
-
+    load_rom(&mut machine, "./roms/hello_world.backseat")?;
+    let mut is_halted = false;
     while !raylib_handle.window_should_close() {
         let mut draw_handle = raylib_handle.begin_drawing(&thread);
         draw_handle.clear_background(Color::BLACK);
         machine.render(&mut draw_handle, &font);
         draw_handle.draw_fps(10, 10);
+        match (is_halted, machine.is_halted()) {
+            (false, true) => {
+                is_halted = true;
+                println!("HALT AND CATCH FIRE");
+            }
+            (false, false) => {
+                machine.make_tick();
+            }
+            (_, _) => {}
+        }
     }
+    Ok(())
 }

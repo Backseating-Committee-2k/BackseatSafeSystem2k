@@ -1,4 +1,4 @@
-use crate::{memory::Memory, processor::Processor, terminal};
+use crate::{memory::Memory, processor::Processor, terminal, Instruction, Size, OPCODE_LENGTH};
 use raylib::prelude::*;
 
 pub struct Machine {
@@ -21,11 +21,23 @@ impl Machine {
     pub fn make_tick(&mut self) {
         self.processor.make_tick(&mut self.memory);
     }
+
+    #[must_use = "Am I a joke to you?"]
+    pub fn is_halted(&self) -> bool {
+        let instruction = self.read_instruction_at_instruction_pointer();
+        let bitmask = !(Instruction::MAX >> OPCODE_LENGTH);
+        (instruction & bitmask) >> (Instruction::SIZE * 8 - OPCODE_LENGTH) == 0x0006
+    }
+
+    fn read_instruction_at_instruction_pointer(&self) -> Instruction {
+        self.memory
+            .read_instruction(self.processor.registers[Processor::INSTRUCTION_POINTER])
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{Address, Instruction, Word};
+    use crate::{Address, Instruction, Size, Word};
 
     use super::*;
 
@@ -50,8 +62,18 @@ mod tests {
         machine
     }
 
+    fn create_machine_with_instructions(instructions: &[Instruction]) -> Machine {
+        let mut machine = Machine::new();
+        for (&instruction, address) in instructions
+            .iter()
+            .zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
+        {
+            machine.memory.write_instruction(address, instruction);
+        }
+        machine
+    }
+
     fn execute_instruction_with_machine(mut machine: Machine, instruction: Instruction) -> Machine {
-        use crate::Size;
         machine
             .memory
             .write_instruction(Processor::ENTRY_POINT, instruction);
@@ -135,5 +157,20 @@ mod tests {
         machine.processor.registers[5] = 0xF0;
         let machine = execute_instruction_with_machine(machine, 0x0005_0505_0000_0000);
         assert_eq!(machine.memory.read_data(0xF0), 0xF0);
+    }
+
+    #[test]
+    fn halt_and_catch_fire_prevents_further_instructions() {
+        // `0006 ____ ____ ____` | halt and catch fire
+        let mut machine =
+            create_machine_with_instructions(&[0x0006_0000_0000_0000, 0x0000_0500_0000_0042]);
+        for _ in 0..2 {
+            machine.make_tick();
+        }
+        assert_eq!(
+            machine.processor.registers[Processor::INSTRUCTION_POINTER],
+            Processor::ENTRY_POINT
+        );
+        assert_eq!(machine.processor.registers[0x5], 0x0);
     }
 }

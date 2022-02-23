@@ -42,10 +42,12 @@ pub fn render(
 
 #[cfg(test)]
 mod tests {
+    use crate::{Size, Word};
+
     use super::*;
 
     #[test]
     fn terminal_character_width_divisible_by_word_size() {
-        assert_eq!(WIDTH % size_of::<Word>(), 0);
+        assert_eq!(WIDTH % Word::SIZE, 0);
     }
 }

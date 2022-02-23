@@ -1,10 +1,16 @@
-use std::mem::size_of;
-
+use crate::Size;
 use crate::{memory::Memory, Address, Instruction, Word};
-use crate::{AsHalfWords, AsWords};
+use crate::{static_assert, AsHalfWords, AsWords};
 
 pub struct Processor {
     pub registers: [Word; Self::NUM_REGISTERS],
+}
+
+const _: () = static_assert(Processor::ENTRY_POINT as usize % Instruction::SIZE == 0);
+
+enum Direction {
+    Forwards,
+    Backwards,
 }
 
 impl Processor {
@@ -20,6 +26,22 @@ impl Processor {
         };
         result.registers[Self::INSTRUCTION_POINTER] = Self::ENTRY_POINT;
         result
+    }
+
+    fn set_instruction_pointer(&mut self, address: Address) {
+        self.registers[Self::INSTRUCTION_POINTER] = address;
+    }
+
+    fn advance_instruction_pointer(&mut self, direction: Direction) {
+        match direction {
+            Direction::Forwards => self.set_instruction_pointer(
+                self.registers[Self::INSTRUCTION_POINTER] + Instruction::SIZE as Address,
+            ),
+            Direction::Backwards => self.set_instruction_pointer(
+                self.registers[Self::INSTRUCTION_POINTER]
+                    .saturating_sub(Instruction::SIZE as Address),
+            ),
+        }
     }
 
     pub fn make_tick(&mut self, memory: &mut Memory) {
@@ -41,8 +63,9 @@ impl Processor {
                 self.registers[registers[0] as usize],
                 self.registers[registers[1] as usize],
             ),
+            0x0006 => return,
             _ => panic!("Unknown opcode!"),
         }
-        self.registers[Self::INSTRUCTION_POINTER] += size_of::<Instruction>() as Address;
+        self.advance_instruction_pointer(Direction::Forwards);
     }
 }

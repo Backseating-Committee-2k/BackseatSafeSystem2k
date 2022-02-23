@@ -1,8 +1,6 @@
 // featuring Tom Hanks
 
-use std::mem::size_of;
-
-use crate::{memory::Memory, Address, Word};
+use crate::{memory::Memory, Address};
 use raylib::prelude::*;
 
 pub const WIDTH: usize = 80;
@@ -17,11 +15,16 @@ pub fn render(
     font_height: f32,
 ) {
     for row in 0..HEIGHT {
-        let words = &memory[row * WIDTH / size_of::<Word>()..][..WIDTH / size_of::<Word>()];
+        let words = &memory[row * WIDTH..][..WIDTH];
         let string: String = words
             .iter()
-            .flat_map(|word| word.to_be_bytes())
-            .map(|c| c.clamp(32, 127))
+            .map(|&word| {
+                if word < 32 || word > 255 {
+                    b' '
+                } else {
+                    word as u8
+                }
+            })
             .map(|c| c as char)
             .collect();
         let text = string.as_str();

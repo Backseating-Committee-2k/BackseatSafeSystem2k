@@ -12,7 +12,7 @@ impl Processor {
     pub const FLAGS: usize = Self::NUM_REGISTERS - 3;
     pub const INSTRUCTION_POINTER: usize = Self::NUM_REGISTERS - 2;
     pub const STACK_POINTER: usize = Self::NUM_REGISTERS - 1;
-    pub const ENTRY_POINT: Address = 0x7D8; // gonna change!
+    pub const ENTRY_POINT: Address = 0x1F48; // gonna change!
 
     pub fn new() -> Self {
         let mut result = Self {

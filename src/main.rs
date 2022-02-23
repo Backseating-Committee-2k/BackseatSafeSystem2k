@@ -6,7 +6,7 @@
 //! | `0000 RR__ CCCC CCCC` | move the value C into register R |
 //! | `0001 RR__ AAAA AAAA` | move the value at address A into register R |
 //! | `0002 TTSS ____ ____` | move the contents of register S into register T |
-//! | `0003 RR00 AAAA AAAA` | move the contents of register R into memory at address A |
+//! | `0003 RR__ AAAA AAAA` | move the contents of register R into memory at address A |
 //! | `0004 TTPP ____ ____` | move the contents addressed by the value of register P into register T |
 //! | `0005 PPSS ____ ____` | move the contents of register S into memory at address specified by register P |
 
@@ -95,12 +95,28 @@ fn main() {
         u32::from_be_bytes("llll".as_bytes().try_into().unwrap()),
     );*/
     let instructions = &[
-        0x0000_4200_4865_6C6C, // "Hell"
-        0x0003_4200_0000_0000,
-        0x0000_4200_6F20_776F, // "o wo"
-        0x0003_4200_0000_0004,
-        0x0000_4200_726C_6421, // "rld!"
-        0x0003_4200_0000_0008,
+        0x0000AA0000000048,
+        0x0003AA0000000000,
+        0x0000AA0000000065,
+        0x0003AA0000000004,
+        0x0000AA000000006c,
+        0x0003AA0000000008,
+        0x0000AA000000006c,
+        0x0003AA000000000C,
+        0x0000AA000000006f,
+        0x0003AA0000000010,
+        0x0000AA0000000020,
+        0x0003AA0000000014,
+        0x0000AA0000000057,
+        0x0003AA0000000018,
+        0x0000AA000000006f,
+        0x0003AA000000001C,
+        0x0000AA0000000072,
+        0x0003AA0000000020,
+        0x0000AA000000006c,
+        0x0003AA0000000024,
+        0x0000AA0000000064,
+        0x0003AA0000000028,
     ];
     save_instructions(&mut machine, instructions);
     for _ in 0..instructions.len() {

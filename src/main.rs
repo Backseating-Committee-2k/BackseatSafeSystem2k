@@ -1,18 +1,8 @@
 #![allow(dead_code)]
 
-//! ## Opcodes
-//! | Opcode                | Meaning                                   |
-//! |-----------------------|-------------------------------------------|
-//! | `0000 RR__ CCCC CCCC` | move the value C into register R |
-//! | `0001 RR__ AAAA AAAA` | move the value at address A into register R |
-//! | `0002 TTSS ____ ____` | move the contents of register S into register T |
-//! | `0003 RR__ AAAA AAAA` | move the contents of register R into memory at address A |
-//! | `0004 TTPP ____ ____` | move the contents addressed by the value of register P into register T |
-//! | `0005 PPSS ____ ____` | move the contents of register S into memory at address specified by register P |
-//! | `0006 ____ ____ ____` | halt and catch fire |
-
 mod machine;
 mod memory;
+mod opcodes;
 mod processor;
 mod terminal;
 
@@ -42,6 +32,15 @@ pub type Instruction = u64;
 pub type Word = u32;
 pub type HalfWord = u16;
 pub type Address = u32;
+
+#[derive(Clone, Copy)]
+pub struct Register(pub u8);
+
+impl From<u8> for Register {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}
 
 const _: () = static_assert(HalfWord::SIZE * 2 == Word::SIZE);
 

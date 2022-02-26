@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 raylib = { version = "3.7", git = "https://github.com/deltaphc/raylib-rs" }
+bitflags = "1.3"

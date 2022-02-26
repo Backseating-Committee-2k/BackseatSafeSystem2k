@@ -37,6 +37,8 @@ impl Machine {
 
 #[cfg(test)]
 mod tests {
+    use crate::opcodes::*;
+    use crate::processor::Flag;
     use crate::{Address, Instruction, Size, Word};
 
     use super::*;
@@ -92,78 +94,112 @@ mod tests {
     #[test]
     fn move_constant_into_register() {
         // 0000 RR__ CCCC CCCC => move the value C into register R
-        let machine = execute_instruction(0x0000_0A00_ABCD_1234);
-        assert_eq!(machine.processor.registers[10], 0xABCD_1234);
+        let register = 0x0A.into();
+        let value = 0xABCD_1234;
+        let machine = execute_instruction(move_register_immediate(register, value));
+        assert_eq!(machine.processor.registers[register], value);
     }
 
     #[test]
     fn move_from_address_into_register() {
         // `0001 RR__ AAAA AAAA` | move the value at address A into register R
-        let machine = create_machine_with_data_at(0xF0, 0xABCD_1234);
-        let machine = execute_instruction_with_machine(machine, 0x0001_0A00_0000_00F0);
-        assert_eq!(machine.processor.registers[10], 0xABCD_1234);
+        let address = 0xF0;
+        let data = 0xABCD_1234;
+        let register = 0x0A.into();
+        let machine = create_machine_with_data_at(address, data);
+        let machine =
+            execute_instruction_with_machine(machine, move_register_address(register, address));
+        assert_eq!(machine.processor.registers[register], data);
     }
 
     #[test]
     fn move_from_one_register_to_another() {
         // `0002 TTSS ____ ____` | move the contents of register S into register T
         let mut machine = Machine::new();
-        machine.processor.registers[5] = 0xCAFE;
-        let machine = execute_instruction_with_machine(machine, 0x0002_0A_05_0000_0000);
-        assert_eq!(machine.processor.registers[10], 0xCAFE);
+        let source = 0x5.into();
+        let target = 0x0A.into();
+        let data = 0xCAFE;
+        machine.processor.registers[source] = data;
+        let machine = execute_instruction_with_machine(machine, move_target_source(target, source));
+        assert_eq!(machine.processor.registers[target], data);
     }
 
     #[test]
     fn move_from_register_into_memory() {
         // `0003 RR__ AAAA AAAA` | move the contents of register R into memory at address A
         let mut machine = Machine::new();
-        machine.processor.registers[5] = 0xC0FFEE;
-        let machine = execute_instruction_with_machine(machine, 0x0003_0500_0000_00F0);
-        assert_eq!(machine.memory.read_data(0xF0), 0xC0FFEE);
+        let register = 0x5.into();
+        let data = 0xC0FFEE;
+        let address = 0xF0;
+        machine.processor.registers[register] = data;
+        let machine =
+            execute_instruction_with_machine(machine, move_address_register(address, register));
+        assert_eq!(machine.memory.read_data(address), data);
     }
 
     #[test]
     fn move_from_memory_addressed_by_register_into_another_register() {
         // `0004 TTPP ____ ____` | move the contents addressed by the value of register P into register T
-        let mut machine = create_machine_with_data_at(0xF0, 0xC0FFEE);
-        machine.processor.registers[5] = 0xF0;
-        let machine = execute_instruction_with_machine(machine, 0x0004_0A05_0000_0000);
-        assert_eq!(machine.processor.registers[10], 0xC0FFEE);
+        let address = 0xF0;
+        let data = 0xC0FFEE;
+        let target = 0x0A.into();
+        let pointer = 0x05.into();
+        let mut machine = create_machine_with_data_at(address, data);
+        machine.processor.registers[pointer] = address;
+        let machine =
+            execute_instruction_with_machine(machine, move_target_pointer(target, pointer));
+        assert_eq!(machine.processor.registers[target], data);
     }
 
     #[test]
     fn move_from_memory_addressed_by_register_into_same_register() {
         // `0004 TTPP ____ ____` | move the contents addressed by the value of register P into register T
-        let mut machine = create_machine_with_data_at(0xF0, 0xC0FFEE);
-        machine.processor.registers[5] = 0xF0;
-        let machine = execute_instruction_with_machine(machine, 0x0004_0505_0000_0000);
-        assert_eq!(machine.processor.registers[5], 0xC0FFEE);
+        let address = 0xF0;
+        let data = 0xC0FFEE;
+        let register = 0x05.into();
+        let mut machine = create_machine_with_data_at(address, data);
+        machine.processor.registers[register] = address;
+        let machine =
+            execute_instruction_with_machine(machine, move_target_pointer(register, register));
+        assert_eq!(machine.processor.registers[register], data);
     }
 
     #[test]
     fn move_from_register_into_memory_addressed_by_another_register() {
         // `0005 PPSS ____ ____` | move the contents of register S into memory at address specified by register P
+        let data = 0xC0FFEE;
+        let address = 0xF0;
+        let pointer = 0x0A.into();
+        let source = 0x05.into();
         let mut machine = Machine::new();
-        machine.processor.registers[5] = 0xC0FFEE;
-        machine.processor.registers[10] = 0xF0;
-        let machine = execute_instruction_with_machine(machine, 0x0005_0A05_0000_0000);
-        assert_eq!(machine.memory.read_data(0xF0), 0xC0FFEE);
+        machine.processor.registers[source] = data;
+        machine.processor.registers[pointer] = address;
+        let machine =
+            execute_instruction_with_machine(machine, move_pointer_source(pointer, source));
+        assert_eq!(machine.memory.read_data(address), data);
     }
 
     #[test]
     fn move_from_register_into_memory_addressed_by_same_register() {
         // `0005 PPSS ____ ____` | move the contents of register S into memory at address specified by register P
+        let address = 0xF0;
+        let register = 0x05.into();
         let mut machine = Machine::new();
-        machine.processor.registers[5] = 0xF0;
-        let machine = execute_instruction_with_machine(machine, 0x0005_0505_0000_0000);
-        assert_eq!(machine.memory.read_data(0xF0), 0xF0);
+        machine.processor.registers[register] = address;
+        let machine =
+            execute_instruction_with_machine(machine, move_pointer_source(register, register));
+        assert_eq!(machine.memory.read_data(address), address);
     }
 
     #[test]
     fn halt_and_catch_fire_prevents_further_instructions() {
         // `0006 ____ ____ ____` | halt and catch fire
-        let mut machine =
-            create_machine_with_instructions(&[0x0006_0000_0000_0000, 0x0000_0500_0000_0042]);
+        let register = 0x05.into();
+        let value = 0x0000_0042;
+        let mut machine = create_machine_with_instructions(&[
+            halt_and_catch_fire(),
+            move_register_immediate(register, value),
+        ]);
         for _ in 0..2 {
             machine.make_tick();
         }
@@ -171,6 +207,329 @@ mod tests {
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             Processor::ENTRY_POINT
         );
-        assert_eq!(machine.processor.registers[0x5], 0x0);
+        assert_eq!(machine.processor.registers[register], 0x0);
+    }
+
+    #[test]
+    fn add_two_values_with_no_flags_set() {
+        // `0007 TTLL RR__ ____` | add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs = 10;
+        let rhs = 12;
+        let expected = lhs + rhs;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            add_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn add_two_values_with_only_zero_flag_set() {
+        // `0007 TTLL RR__ ____` | add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs = 0;
+        let rhs = 0;
+        let expected = lhs + rhs;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            add_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn add_two_values_with_only_carry_flag_set() {
+        // `0007 TTLL RR__ ____` | add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs = Word::MAX;
+        let rhs = 5;
+        let expected = lhs.wrapping_add(rhs);
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            add_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+    }
+
+    #[test]
+    fn add_two_values_with_both_zero_and_carry_flags_set() {
+        // `0007 TTLL RR__ ____` | add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs = Word::MAX;
+        let rhs = 1;
+        let expected = lhs.wrapping_add(rhs);
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            add_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+    }
+
+    #[test]
+    fn subtract_two_values_with_no_flags_set() {
+        // `0008 TTLL RR__ ____` | subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs = 10;
+        let rhs = 8;
+        let expected = lhs - rhs;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            subtract_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn subtract_two_values_with_only_zero_flag_set() {
+        // `0008 TTLL RR__ ____` | subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs = 10;
+        let rhs = 10;
+        let expected = lhs - rhs;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            subtract_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn subtract_two_values_with_only_carry_flag_set() {
+        // `0008 TTLL RR__ ____` | subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs: Word = 10;
+        let rhs = 12;
+        let expected = lhs.wrapping_sub(rhs);
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            subtract_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+    }
+
+    #[test]
+    fn subtract_two_values_with_carry_with_no_flags_set() {
+        // `0009 TTLL RR__ ____` | subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs: Word = 14;
+        let rhs = 12;
+        let expected = lhs.wrapping_sub(rhs + 1 /* carry */);
+        let mut machine = Machine::new();
+        machine.processor.set_flag(Flag::Carry, true);
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            subtract_with_carry_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn subtract_two_values_with_carry_with_zero_flag_set() {
+        // `0009 TTLL RR__ ____` | subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs: Word = 14;
+        let rhs = 13;
+        let expected = lhs.wrapping_sub(rhs + 1 /* carry */);
+        let mut machine = Machine::new();
+        machine.processor.set_flag(Flag::Carry, true);
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            subtract_with_carry_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn subtract_two_values_with_carry_with_both_carry_and_zero_flags_set() {
+        // `0009 TTLL RR__ ____` | subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_register = 0x0A.into();
+        let lhs: Word = 0;
+        let rhs = Word::MAX;
+        let expected = lhs.wrapping_sub(rhs).wrapping_sub(1);
+        let mut machine = Machine::new();
+        machine.processor.set_flag(Flag::Carry, true);
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            subtract_with_carry_target_lhs_rhs(target_register, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_register], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+    }
+
+    #[test]
+    fn multiply_two_values_without_any_flags_set() {
+        // `000A HHTT LLRR ____` | multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_high = 0x09.into();
+        let target_low = 0x0A.into();
+        let lhs: Word = 3;
+        let rhs = 4;
+        let expected = lhs * rhs;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            multiply_target_lhs_rhs(target_high, target_low, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_high], 0);
+        assert_eq!(machine.processor.registers[target_low], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn multiply_two_values_with_zero_flag_set() {
+        // `000A HHTT LLRR ____` | multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_high = 0x09.into();
+        let target_low = 0x0A.into();
+        let lhs: Word = 3;
+        let rhs = 0;
+        let expected = lhs * rhs;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            multiply_target_lhs_rhs(target_high, target_low, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_high], 0);
+        assert_eq!(machine.processor.registers[target_low], expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+    }
+
+    #[test]
+    fn multiply_two_values_with_overflow() {
+        // `000A HHTT LLRR ____` | multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately
+        let lhs_register = 0x42.into();
+        let rhs_register = 0x43.into();
+        let target_high = 0x09.into();
+        let target_low = 0x0A.into();
+        let lhs: Word = Word::MAX;
+        let rhs = 5;
+        let result = lhs as u64 * rhs as u64;
+        let high_expected = (result >> 32) as u32;
+        let low_expected = result as u32;
+        let mut machine = Machine::new();
+        machine.processor.registers[lhs_register] = lhs;
+        machine.processor.registers[rhs_register] = rhs;
+        let mut machine = execute_instruction_with_machine(
+            machine,
+            multiply_target_lhs_rhs(target_high, target_low, lhs_register, rhs_register),
+        );
+        machine.make_tick();
+        assert_eq!(machine.processor.registers[lhs_register], lhs);
+        assert_eq!(machine.processor.registers[rhs_register], rhs);
+        assert_eq!(machine.processor.registers[target_high], high_expected);
+        assert_eq!(machine.processor.registers[target_low], low_expected);
+        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
     }
 }

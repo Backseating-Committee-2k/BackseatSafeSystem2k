@@ -1,0 +1,20 @@
+# VHDL model
+
+This should implement the same ISA as the emulator, but aims to be
+synthesizable inside an FPGA or ASIC.
+
+## Core
+
+The main CPU core (`cpu`) has separate 64 bit instruction and 32 bit data
+buses that are fully synchronous and assumes that any memory interface or
+peripherals are external.
+
+## Testbench
+
+Testbenches can be run automatically using the `sim.sh` script, and require
+GHDL to run, and GtkWave to inspect the waveform data.
+
+### CPU testbench
+
+This testbench loads the "Hello world" example binary, and executes it in
+the CPU, then terminates when the CPU stops.

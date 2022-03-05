@@ -12,16 +12,18 @@
 //! | `0008 TTLL RR__ ____` | subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
 //! | `0009 TTLL RR__ ____` | subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
 //! | `000A HHTT LLRR ____` | multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately |
-//! | `000B DDMM LLRR ____` | divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and carry flags appropriately |
-//! | `000C TTLL RR__ ____` | and the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `000D TTLL RR__ ____` | or the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `000E TTLL RR__ ____` | xor the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `000F TTSS ____ ____` | not the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `0010 TTLL RR__ ____` | left shift the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `0011 TTLL RR__ ____` | right shift the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
+//! | `000B DDMM LLRR ____` | divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately |
+//! | `000C TTLL RR__ ____` | and the values in registers LL and RR, store the result in TT, set zero flag appropriately |
+//! | `000D TTLL RR__ ____` | or the values in registers LL and RR, store the result in TT, set zero flag appropriately |
+//! | `000E TTLL RR__ ____` | xor the values in registers LL and RR, store the result in TT, set zero flag appropriately |
+//! | `000F TTSS ____ ____` | not the value in register SS, store the result in TT, set zero flag appropriately |
+//! | `0010 TTLL RR__ ____` | left shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately |
+//! | `0011 TTLL RR__ ____` | right shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately |
 //! | `0012 TTSS CCCC CCCC` | add the constant CC to the value in register SS and store the result in TT, set zero and carry flags appropriately |
-//! | `0013 TTSS CCCC CCCC` | subtract the constant CC from the value in register SS ans store the result in TT, set zero and carry flags appropriately |
-//! | `0014 TTLL RR__ ____` | compare shift the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
+//! | `0013 TTSS CCCC CCCC` | subtract the constant CC from the value in register SS and store the result in TT, set zero and carry flags appropriately |
+//! | `0014 TTLL RR__ ____` | compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately |
+//! | `0015 RR__ ____ ____` | push the value of register RR onto the stack |
+//! | `0016 RR__ ____ ____` | pop from the stack and store the value in register RR |
 
 use crate::{Address, Instruction, Register, Word};
 
@@ -125,7 +127,7 @@ pub fn xor_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Ins
         | (rhs.0 as Instruction) << 24
 }
 
-pub fn not_target_lhs_rhs(target: Register, source: Register) -> Instruction {
+pub fn not_target_source(target: Register, source: Register) -> Instruction {
     0x000F_0000_0000_0000 | (target.0 as Instruction) << 40 | (source.0 as Instruction) << 32
 }
 
@@ -166,4 +168,12 @@ pub fn compare_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) ->
         | (target.0 as Instruction) << 40
         | (lhs.0 as Instruction) << 32
         | (rhs.0 as Instruction) << 24
+}
+
+pub fn push_register(register: Register) -> Instruction {
+    0x0015_0000_0000_0000 | (register.0 as Instruction) << 40
+}
+
+pub fn pop_register(register: Register) -> Instruction {
+    0x0016_0000_0000_0000 | (register.0 as Instruction) << 40
 }

@@ -1,5 +1,5 @@
-use crate::{Address, Instruction, Word};
-use std::{mem::size_of, ops::Range};
+use crate::{Address, Instruction, Size, Word};
+use std::ops::Range;
 
 pub struct Memory {
     data: Vec<Word>,
@@ -15,17 +15,17 @@ impl Memory {
     }
 
     fn address_to_word_index(address: Address) -> usize {
-        debug_assert!(address as usize % size_of::<Address>() == 0);
-        address as usize / size_of::<Address>()
+        debug_assert!(address as usize % Address::SIZE == 0);
+        address as usize / Address::SIZE
     }
 
     pub fn read_instruction(&self, address: Address) -> Instruction {
-        debug_assert!(address as usize % size_of::<Instruction>() == 0);
+        debug_assert!(address as usize % Instruction::SIZE == 0);
         let word_index = Self::address_to_word_index(address);
-        let slice = &self.data[word_index..][..size_of::<Instruction>() / size_of::<Word>()];
+        let slice = &self.data[word_index..][..Instruction::SIZE / Word::SIZE];
         let mut result = 0;
         for &word in slice {
-            result = (result << (8 * size_of::<Word>())) | word as Instruction;
+            result = (result << (8 * Word::SIZE)) | word as Instruction;
         }
         result
     }
@@ -35,12 +35,12 @@ impl Memory {
     }
 
     pub fn write_instruction(&mut self, address: Address, mut instruction: Instruction) {
-        debug_assert!(address as usize % size_of::<Instruction>() == 0);
+        debug_assert!(address as usize % Instruction::SIZE == 0);
         let word_index = Self::address_to_word_index(address);
         let bit_mask = Word::MAX as Instruction;
-        for index in (word_index..word_index + size_of::<Instruction>() / size_of::<Word>()).rev() {
+        for index in (word_index..word_index + Instruction::SIZE / Word::SIZE).rev() {
             self.data[index] = (instruction & bit_mask) as Word;
-            instruction >>= 8 * size_of::<Word>();
+            instruction >>= 8 * Word::SIZE;
         }
     }
 
@@ -49,7 +49,7 @@ impl Memory {
     }
 
     pub fn fill(&mut self, range: Range<Address>, value: Word) {
-        for address in range.step_by(size_of::<Word>()) {
+        for address in range.step_by(Word::SIZE) {
             self.write_data(address, value);
         }
     }
@@ -94,14 +94,14 @@ mod tests {
 
         // fill memory
         let mut instruction = 0x0;
-        for address in (0..Memory::SIZE).step_by(size_of::<Instruction>()) {
+        for address in (0..Memory::SIZE).step_by(Instruction::SIZE) {
             memory.write_instruction(address as Address, instruction);
             instruction = instruction.wrapping_add(1);
         }
 
         // read back memory
         instruction = 0x0;
-        for address in (0..Memory::SIZE).step_by(size_of::<Instruction>()) {
+        for address in (0..Memory::SIZE).step_by(Instruction::SIZE) {
             assert_eq!(memory.read_instruction(address as Address), instruction);
             instruction = instruction.wrapping_add(1);
         }
@@ -113,14 +113,14 @@ mod tests {
 
         // fill memory
         let mut data = 0x0;
-        for address in (0..Memory::SIZE).step_by(size_of::<Word>()) {
+        for address in (0..Memory::SIZE).step_by(Word::SIZE) {
             memory.write_data(address as Address, data);
             data = data.wrapping_add(1);
         }
 
         // read back memory
         data = 0x0;
-        for address in (0..Memory::SIZE).step_by(size_of::<Word>()) {
+        for address in (0..Memory::SIZE).step_by(Word::SIZE) {
             assert_eq!(memory.read_data(address as Address), data);
             data = data.wrapping_add(1);
         }

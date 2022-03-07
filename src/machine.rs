@@ -102,7 +102,7 @@ mod tests {
         let register = 0x0A.into();
         let value = 0xABCD_1234;
         let machine = execute_instruction(MoveRegisterImmediate {
-            r: register,
+            register,
             immediate: value,
         });
         assert_eq!(machine.processor.registers[register], value);
@@ -114,13 +114,8 @@ mod tests {
         let data = 0xABCD_1234;
         let register = 0x0A.into();
         let machine = create_machine_with_data_at(address, data);
-        let machine = execute_instruction_with_machine(
-            machine,
-            MoveRegisterAddress {
-                r: register,
-                address,
-            },
-        );
+        let machine =
+            execute_instruction_with_machine(machine, MoveRegisterAddress { register, address });
         assert_eq!(machine.processor.registers[register], data);
     }
 
@@ -131,13 +126,8 @@ mod tests {
         let target = 0x0A.into();
         let data = 0xCAFE;
         machine.processor.registers[source] = data;
-        let machine = execute_instruction_with_machine(
-            machine,
-            MoveTargetSource {
-                t: target,
-                s: source,
-            },
-        );
+        let machine =
+            execute_instruction_with_machine(machine, MoveTargetSource { target, source });
         assert_eq!(machine.processor.registers[target], data);
     }
 
@@ -148,13 +138,8 @@ mod tests {
         let data = 0xC0FFEE;
         let address = 0xF0;
         machine.processor.registers[register] = data;
-        let machine = execute_instruction_with_machine(
-            machine,
-            MoveAddressRegister {
-                address,
-                r: register,
-            },
-        );
+        let machine =
+            execute_instruction_with_machine(machine, MoveAddressRegister { address, register });
         assert_eq!(machine.memory.read_data(address), data);
     }
 
@@ -166,13 +151,8 @@ mod tests {
         let pointer = 0x05.into();
         let mut machine = create_machine_with_data_at(address, data);
         machine.processor.registers[pointer] = address;
-        let machine = execute_instruction_with_machine(
-            machine,
-            MoveTargetPointer {
-                t: target,
-                p: pointer,
-            },
-        );
+        let machine =
+            execute_instruction_with_machine(machine, MoveTargetPointer { target, pointer });
         assert_eq!(machine.processor.registers[target], data);
     }
 
@@ -186,8 +166,8 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             MoveTargetPointer {
-                t: register,
-                p: register,
+                target: register,
+                pointer: register,
             },
         );
         assert_eq!(machine.processor.registers[register], data);
@@ -202,13 +182,8 @@ mod tests {
         let mut machine = Machine::new();
         machine.processor.registers[source] = data;
         machine.processor.registers[pointer] = address;
-        let machine = execute_instruction_with_machine(
-            machine,
-            MovePointerSource {
-                p: pointer,
-                s: source,
-            },
-        );
+        let machine =
+            execute_instruction_with_machine(machine, MovePointerSource { pointer, source });
         assert_eq!(machine.memory.read_data(address), data);
     }
 
@@ -221,8 +196,8 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             MovePointerSource {
-                p: register,
-                s: register,
+                pointer: register,
+                source: register,
             },
         );
         assert_eq!(machine.memory.read_data(address), address);
@@ -235,7 +210,7 @@ mod tests {
         let mut machine = create_machine_with_instructions(&[
             HaltAndCatchFire {},
             MoveRegisterImmediate {
-                r: register,
+                register,
                 immediate: value,
             },
         ]);
@@ -263,9 +238,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             AddTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -290,9 +265,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             AddTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -317,9 +292,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             AddTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -344,9 +319,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             AddTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -371,9 +346,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             SubtractTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -398,9 +373,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             SubtractTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -425,9 +400,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             SubtractTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -453,9 +428,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             SubtractWithCarryTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -481,9 +456,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             SubtractWithCarryTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -509,9 +484,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             SubtractWithCarryTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -537,10 +512,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             MultiplyHighLowLhsRhs {
-                h: target_high,
-                t: target_low,
-                l: lhs_register,
-                r: rhs_register,
+                high: target_high,
+                low: target_low,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -567,10 +542,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             MultiplyHighLowLhsRhs {
-                h: target_high,
-                t: target_low,
-                l: lhs_register,
-                r: rhs_register,
+                high: target_high,
+                low: target_low,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -599,10 +574,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             MultiplyHighLowLhsRhs {
-                h: target_high,
-                t: target_low,
-                l: lhs_register,
-                r: rhs_register,
+                high: target_high,
+                low: target_low,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -631,10 +606,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             MultiplyHighLowLhsRhs {
-                h: target_high,
-                t: target_low,
-                l: lhs_register,
-                r: rhs_register,
+                high: target_high,
+                low: target_low,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -662,10 +637,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             DivmodTargetModLhsRhs {
-                d: target_quotient,
-                m: target_remainder,
-                l: lhs_register,
-                r: rhs_register,
+                result: target_quotient,
+                reminder: target_remainder,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -699,10 +674,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             DivmodTargetModLhsRhs {
-                d: target_quotient,
-                m: target_remainder,
-                l: lhs_register,
-                r: rhs_register,
+                result: target_quotient,
+                reminder: target_remainder,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -736,10 +711,10 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             DivmodTargetModLhsRhs {
-                d: target_quotient,
-                m: target_remainder,
-                l: lhs_register,
-                r: rhs_register,
+                result: target_quotient,
+                reminder: target_remainder,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -772,9 +747,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             AndTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -799,9 +774,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             AndTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -826,9 +801,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             OrTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -853,9 +828,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             OrTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -880,9 +855,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             XorTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -907,9 +882,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             XorTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -927,13 +902,7 @@ mod tests {
         let data = 0b00101010_00011000_00101010_00011000;
         let expected = 0b11010101_11100111_11010101_11100111;
         machine.processor.registers[source] = data;
-        let machine = execute_instruction_with_machine(
-            machine,
-            NotTargetSource {
-                t: target,
-                s: source,
-            },
-        );
+        let machine = execute_instruction_with_machine(machine, NotTargetSource { target, source });
         assert_eq!(machine.processor.registers[target], expected);
         assert_eq!(machine.processor.get_flag(Flag::Zero), false);
     }
@@ -946,13 +915,7 @@ mod tests {
         let data = 0xFFFFFFFF;
         let expected = 0;
         machine.processor.registers[source] = data;
-        let machine = execute_instruction_with_machine(
-            machine,
-            NotTargetSource {
-                t: target,
-                s: source,
-            },
-        );
+        let machine = execute_instruction_with_machine(machine, NotTargetSource { target, source });
         assert_eq!(machine.processor.registers[target], expected);
         assert_eq!(machine.processor.get_flag(Flag::Zero), true);
     }
@@ -971,9 +934,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             LeftShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -997,9 +960,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             LeftShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1023,9 +986,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             LeftShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1049,9 +1012,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             LeftShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1075,9 +1038,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             LeftShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1101,9 +1064,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             RightShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1127,9 +1090,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             RightShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1153,9 +1116,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             RightShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1179,9 +1142,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             RightShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1205,9 +1168,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             RightShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1231,9 +1194,9 @@ mod tests {
         let machine = execute_instruction_with_machine(
             machine,
             RightShiftTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         assert_eq!(machine.processor.registers[lhs_register], lhs);
@@ -1248,16 +1211,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 2;
+        let immediate = 2;
         let source_value = 40;
         let expected_value = 42;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             AddTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1271,16 +1234,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 0;
+        let immediate = 0;
         let source_value = 0;
         let expected_value = 0;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             AddTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1294,16 +1257,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 5;
+        let immediate = 5;
         let source_value = Word::MAX;
         let expected_value = 4;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             AddTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1317,16 +1280,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 1;
+        let immediate = 1;
         let source_value = Word::MAX;
         let expected_value = 0;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             AddTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1340,16 +1303,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 2;
+        let immediate = 2;
         let source_value = 44;
         let expected_value = 42;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             SubtractTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1363,16 +1326,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 42;
+        let immediate = 42;
         let source_value = 42;
         let expected_value = 0;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             SubtractTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1386,16 +1349,16 @@ mod tests {
         let mut machine = Machine::new();
         let target_register = 0xAB.into();
         let source_register = 0x07.into();
-        let constant = 2;
+        let immediate = 2;
         let source_value = 1;
         let expected_value = Word::MAX;
         machine.processor.registers[source_register] = source_value;
         let machine = execute_instruction_with_machine(
             machine,
             SubtractTargetSourceImmediate {
-                t: target_register,
-                s: source_register,
-                immediate: constant,
+                target: target_register,
+                source: source_register,
+                immediate,
             },
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
@@ -1418,9 +1381,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             CompareTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -1444,9 +1407,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             CompareTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -1470,9 +1433,9 @@ mod tests {
         let mut machine = execute_instruction_with_machine(
             machine,
             CompareTargetLhsRhs {
-                t: target_register,
-                l: lhs_register,
-                r: rhs_register,
+                target: target_register,
+                lhs: lhs_register,
+                rhs: rhs_register,
             },
         );
         machine.make_tick();
@@ -1493,14 +1456,23 @@ mod tests {
             machine.processor.get_stack_pointer(),
             Processor::STACK_START
         );
-        let machine =
-            execute_instruction_with_machine(machine, PushRegister { r: source_register });
+        let machine = execute_instruction_with_machine(
+            machine,
+            PushRegister {
+                register: source_register,
+            },
+        );
         assert_eq!(
             machine.processor.get_stack_pointer(),
             Processor::STACK_START + Word::SIZE as Address
         );
         assert_eq!(machine.memory.read_data(Processor::STACK_START), data);
-        let machine = execute_instruction_with_machine(machine, PopRegister { r: target_register });
+        let machine = execute_instruction_with_machine(
+            machine,
+            PopRegister {
+                register: target_register,
+            },
+        );
         assert_eq!(
             machine.processor.get_stack_pointer(),
             Processor::STACK_START
@@ -1514,7 +1486,7 @@ mod tests {
         let mut machine = Machine::new();
         for (register, value) in (0..).map(Register).zip(values) {
             machine.processor.registers[register] = value;
-            machine = execute_instruction_with_machine(machine, PushRegister { r: register });
+            machine = execute_instruction_with_machine(machine, PushRegister { register });
             assert_eq!(
                 machine.processor.get_stack_pointer(),
                 Processor::STACK_START + (register.0 as Address + 1) * Word::SIZE as Address
@@ -1528,7 +1500,7 @@ mod tests {
         }
         for &value in values.iter().rev() {
             let target = 0xAB.into();
-            machine = execute_instruction_with_machine(machine, PopRegister { r: target });
+            machine = execute_instruction_with_machine(machine, PopRegister { register: target });
             assert_eq!(machine.processor.registers[target], value);
         }
         assert_eq!(

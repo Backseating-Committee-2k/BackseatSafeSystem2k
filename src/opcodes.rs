@@ -123,17 +123,21 @@ macro_rules! type_to_datatype {
 }
 
 macro_rules! registers_to_instruction {
-    ( $($register:ident),*) => {
-        {
-            let mut _shift = 40;
-            #[allow(unused_mut)]
-            let mut result = 0;
-            $(
-                result |= ($register.0 as Instruction) << _shift;
-                _shift -= 8;
-            )*
-            result
-        }
+    // entrypoint with at least one element
+    ( $( $r:ident ),+ ) => {
+        registers_to_instruction!(@ $( $r ),+ v 48)
+    };
+    // entrypoint with zero elements
+    () => {
+        0 as Instruction
+    };
+    // inner invocation with more then one element
+    (@ $r:ident, $( $rest:ident ),+ v $v:expr ) => {
+        ( ($r.0 as Instruction) << ($v-8) | registers_to_instruction!(@ $( $rest ),+ v $v - 8 ) )
+    };
+    // inner invocation with exactly one element
+    (@ $r:ident v $v:expr ) => {
+        ( ($r.0 as Instruction) << ($v-8) )
     };
 }
 

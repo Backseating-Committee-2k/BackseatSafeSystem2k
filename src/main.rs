@@ -33,7 +33,7 @@ pub type Word = u32;
 pub type HalfWord = u16;
 pub type Address = u32;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Register(pub u8);
 
 impl From<u8> for Register {

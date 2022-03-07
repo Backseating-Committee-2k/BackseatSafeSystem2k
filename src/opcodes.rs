@@ -1,179 +1,196 @@
-//! ## Opcodes
-//! | Opcode                | Meaning                                   |
-//! |-----------------------|-------------------------------------------|
-//! | `0000 RR__ CCCC CCCC` | move the value C into register R |
-//! | `0001 RR__ AAAA AAAA` | move the value at address A into register R |
-//! | `0002 TTSS ____ ____` | move the contents of register S into register T |
-//! | `0003 RR__ AAAA AAAA` | move the contents of register R into memory at address A |
-//! | `0004 TTPP ____ ____` | move the contents addressed by the value of register P into register T |
-//! | `0005 PPSS ____ ____` | move the contents of register S into memory at address specified by register P |
-//! | `0006 ____ ____ ____` | halt and catch fire |
-//! | `0007 TTLL RR__ ____` | add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `0008 TTLL RR__ ____` | subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `0009 TTLL RR__ ____` | subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately |
-//! | `000A HHTT LLRR ____` | multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately |
-//! | `000B DDMM LLRR ____` | divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately |
-//! | `000C TTLL RR__ ____` | and the values in registers LL and RR, store the result in TT, set zero flag appropriately |
-//! | `000D TTLL RR__ ____` | or the values in registers LL and RR, store the result in TT, set zero flag appropriately |
-//! | `000E TTLL RR__ ____` | xor the values in registers LL and RR, store the result in TT, set zero flag appropriately |
-//! | `000F TTSS ____ ____` | not the value in register SS, store the result in TT, set zero flag appropriately |
-//! | `0010 TTLL RR__ ____` | left shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately |
-//! | `0011 TTLL RR__ ____` | right shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately |
-//! | `0012 TTSS CCCC CCCC` | add the constant CC to the value in register SS and store the result in TT, set zero and carry flags appropriately |
-//! | `0013 TTSS CCCC CCCC` | subtract the constant CC from the value in register SS and store the result in TT, set zero and carry flags appropriately |
-//! | `0014 TTLL RR__ ____` | compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately |
-//! | `0015 RR__ ____ ____` | push the value of register RR onto the stack |
-//! | `0016 RR__ ____ ____` | pop from the stack and store the value in register RR |
-
 use crate::{Address, Instruction, Register, Word};
 
-pub fn move_register_immediate(register: Register, value: Word) -> Instruction {
-    (register.0 as Instruction) << 40 | value as Instruction
+macro_rules! type_to_abbreviation {
+    (immediate) => {
+        "cccc\u{00a0}cccc"
+    };
+    (address) => {
+        "aaaa\u{00a0}aaaa"
+    };
 }
 
-pub fn move_register_address(register: Register, address: Address) -> Instruction {
-    0x0001_0000_0000_0000 | (register.0 as Instruction) << 40 | address as Instruction
+macro_rules! stringify_registers {
+    ( () ) => {
+        "____\u{00a0}____\u{00a0}____"
+    };
+    ( (), $type:ident ) => {
+        concat!("____\u{00a0}", type_to_abbreviation!($type))
+    };
+    ( ( $r0:ident ) ) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            "__\u{00a0}____\u{00a0}____"
+        )
+    };
+    ( ( $r0:ident, $r1:ident ) ) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            stringify!($r1),
+            stringify!($r1),
+            "\u{00a0}____\u{00a0}____"
+        )
+    };
+    ( ( $r0:ident ), $type:ident) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            "__\u{00a0}",
+            type_to_abbreviation!($type)
+        )
+    };
+    ( ( $r0:ident, $r1:ident ), $type:ident) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            stringify!($r1),
+            stringify!($r1),
+            "\u{00a0}",
+            type_to_abbreviation!($type)
+        )
+    };
+    ( ($r0:ident, $r1:ident, $r2:ident) ) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            stringify!($r1),
+            stringify!($r1),
+            "\u{00a0}",
+            stringify!($r2),
+            stringify!($r2),
+            "__\u{00a0}____"
+        )
+    };
+    ( ($r0:ident, $r1:ident, $r2:ident, $r3:ident) ) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            stringify!($r1),
+            stringify!($r1),
+            "\u{00a0}",
+            stringify!($r2),
+            stringify!($r2),
+            stringify!($r3),
+            stringify!($r3),
+            "\u{00a0}____",
+        )
+    };
+    ( ($r0:ident, $r1:ident, $r2:ident, $r3:ident, $r4:ident) ) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            stringify!($r1),
+            stringify!($r1),
+            "\u{00a0}",
+            stringify!($r2),
+            stringify!($r2),
+            stringify!($r3),
+            stringify!($r3),
+            "\u{00a0}",
+            stringify!($r4),
+            stringify!($r4),
+            "__",
+        )
+    };
+    ( ($r0:ident, $r1:ident, $r2:ident, $r3:ident, $r4:ident, $r5:ident) ) => {
+        concat!(
+            stringify!($r0),
+            stringify!($r0),
+            stringify!($r1),
+            stringify!($r1),
+            "\u{00a0}",
+            stringify!($r2),
+            stringify!($r2),
+            stringify!($r3),
+            stringify!($r3),
+            "\u{00a0}",
+            stringify!($r4),
+            stringify!($r4),
+            stringify!($r5),
+            stringify!($r5),
+        )
+    };
 }
 
-pub fn move_target_source(target: Register, source: Register) -> Instruction {
-    0x0002_0000_0000_0000 | (target.0 as Instruction) << 40 | (source.0 as Instruction) << 32
+macro_rules! type_to_datatype {
+    (immediate) => {
+        Word
+    };
+    (address) => {
+        Address
+    };
 }
 
-pub fn move_address_register(address: Address, register: Register) -> Instruction {
-    0x0003_0000_0000_0000 | (register.0 as Instruction) << 40 | address as Instruction
+macro_rules! registers_to_instruction {
+    ( $($register:ident),*) => {
+        {
+            let mut _shift = 40;
+            #[allow(unused_mut)]
+            let mut result = 0;
+            $(
+                result |= ($register.0 as Instruction) << _shift;
+                _shift -= 8;
+            )*
+            result
+        }
+    };
 }
 
-pub fn move_target_pointer(target: Register, pointer: Register) -> Instruction {
-    0x0004_0000_0000_0000 | (target.0 as Instruction) << 40 | (pointer.0 as Instruction) << 32
+macro_rules! opcodes {
+    ( $({
+        $identifier:ident,
+        $code:literal,
+        register( $( $register_name:ident ),* ) $(, $type:ident )?,
+        $comment:literal
+    },)+ ) => {
+        /// ## Opcodes
+        /// | Opcode                | Meaning                                   |
+        /// |-----------------------|-------------------------------------------|
+        $(
+            #[doc = concat!(" | `", stringify!($code), "\u{00a0}", stringify_registers!(($( $register_name ),*) $(, $type)?), "` | ", $comment, " |")]
+        )+
+        #[derive(Clone, Copy, Debug)]
+        pub enum Opcode {
+            $(
+                $identifier{ $( $register_name : Register, )* $($type : type_to_datatype!($type))? },
+            )+
+        }
+
+        impl Opcode {
+            pub fn as_instruction(self) -> Instruction {
+                match self {
+                    $(
+                        Self::$identifier{ $( $register_name, )* $($type)?} => (($code as Instruction) << Instruction::BITS - u16::BITS) | registers_to_instruction!($( $register_name ),*) $(| $type as Instruction)?,
+                    )+
+                }
+            }
+        }
+    };
 }
 
-pub fn move_pointer_source(pointer: Register, source: Register) -> Instruction {
-    0x0005_0000_0000_0000 | (pointer.0 as Instruction) << 40 | (source.0 as Instruction) << 32
-}
-
-pub fn halt_and_catch_fire() -> Instruction {
-    0x0006_0000_0000_0000
-}
-
-pub fn add_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x0007_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn subtract_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x0008_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn subtract_with_carry_target_lhs_rhs(
-    target: Register,
-    lhs: Register,
-    rhs: Register,
-) -> Instruction {
-    0x0009_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn multiply_target_lhs_rhs(
-    target_high: Register,
-    target_low: Register,
-    lhs: Register,
-    rhs: Register,
-) -> Instruction {
-    0x000A_0000_0000_0000
-        | (target_high.0 as Instruction) << 40
-        | (target_low.0 as Instruction) << 32
-        | (lhs.0 as Instruction) << 24
-        | (rhs.0 as Instruction) << 16
-}
-
-pub fn divmod_target_mod_lhs_rhs(
-    target: Register,
-    mod_: Register,
-    lhs: Register,
-    rhs: Register,
-) -> Instruction {
-    0x000B_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (mod_.0 as Instruction) << 32
-        | (lhs.0 as Instruction) << 24
-        | (rhs.0 as Instruction) << 16
-}
-
-pub fn and_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x000C_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn or_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x000D_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn xor_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x000E_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn not_target_source(target: Register, source: Register) -> Instruction {
-    0x000F_0000_0000_0000 | (target.0 as Instruction) << 40 | (source.0 as Instruction) << 32
-}
-
-pub fn left_shift_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x0010_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn right_shift_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x0011_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn add_target_source_immediate(target: Register, source: Register, value: Word) -> Instruction {
-    0x0012_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (source.0 as Instruction) << 32
-        | value as Instruction
-}
-
-pub fn subtract_target_source_immediate(
-    target: Register,
-    source: Register,
-    value: Word,
-) -> Instruction {
-    0x0013_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (source.0 as Instruction) << 32
-        | value as Instruction
-}
-
-pub fn compare_target_lhs_rhs(target: Register, lhs: Register, rhs: Register) -> Instruction {
-    0x0014_0000_0000_0000
-        | (target.0 as Instruction) << 40
-        | (lhs.0 as Instruction) << 32
-        | (rhs.0 as Instruction) << 24
-}
-
-pub fn push_register(register: Register) -> Instruction {
-    0x0015_0000_0000_0000 | (register.0 as Instruction) << 40
-}
-
-pub fn pop_register(register: Register) -> Instruction {
-    0x0016_0000_0000_0000 | (register.0 as Instruction) << 40
-}
+opcodes!(
+    { MoveRegisterImmediate, 0x0000,  register(r), immediate, "move the value C into register R" },
+    { MoveRegisterAddress, 0x0001,  register(r), address, "move the value at address A into register R" },
+    { MoveTargetSource, 0x0002, register(t, s), "move the contents of register S into register T" },
+    { MoveAddressRegister, 0x0003, register(r), address, "move the contents of register R into memory at address A" },
+    { MoveTargetPointer, 0x0004, register(t, p), "move the contents addressed by the value of register P into register T" },
+    { MovePointerSource, 0x0005, register(p, s), "move the contents of register S into memory at address specified by register P" },
+    { HaltAndCatchFire, 0x0006, register(), "halt and catch fire" },
+    { AddTargetLhsRhs, 0x0007, register(t, l, r), "add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
+    { SubtractTargetLhsRhs, 0x0008, register(t, l, r), "subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
+    { SubtractWithCarryTargetLhsRhs, 0x0009, register(t, l, r), "subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
+    { MultiplyHighLowLhsRhs, 0x000A, register(h, t, l, r), "multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately" },
+    { DivmodTargetModLhsRhs, 0x000B, register(d, m, l, r), "divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately" },
+    { AndTargetLhsRhs, 0x000C, register(t, l, r), "and the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
+    { OrTargetLhsRhs, 0x000D, register(t, l, r), "or the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
+    { XorTargetLhsRhs, 0x000E, register(t, l, r), "xor the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
+    { NotTargetSource, 0x000F, register(t, s), "not the value in register SS, store the result in TT, set zero flag appropriately" },
+    { LeftShiftTargetLhsRhs, 0x0010, register(t, l, r), "left shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately" },
+    { RightShiftTargetLhsRhs, 0x0011, register(t, l, r), "right shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately" },
+    { AddTargetSourceImmediate, 0x0012, register(t, s), immediate, "add the constant CC to the value in register SS and store the result in TT, set zero and carry flags appropriately" },
+    { SubtractTargetSourceImmediate, 0x0013, register(t, s), immediate, "subtract the constant CC from the value in register SS and store the result in TT, set zero and carry flags appropriately" },
+    { CompareTargetLhsRhs, 0x0014, register(t, l, r), "compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately" },
+    { PushRegister, 0x0015, register(r), "push the value of register RR onto the stack" },
+    { PopRegister, 0x0016, register(r), "pop from the stack and store the value in register RR" },
+);

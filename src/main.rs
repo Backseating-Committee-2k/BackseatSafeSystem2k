@@ -6,7 +6,7 @@ mod opcodes;
 mod processor;
 mod terminal;
 
-use std::{error::Error, path::Path};
+use std::{env, error::Error, path::Path};
 
 use machine::Machine;
 use processor::Processor;
@@ -100,16 +100,18 @@ fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let rom_filename = env::args()
+        .nth(1)
+        .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
+    let mut machine = Machine::new();
+    load_rom(&mut machine, rom_filename)?;
     let (mut raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
         .build();
-    let mut machine = Machine::new();
     let font = raylib_handle
         .load_font(&thread, "./resources/CozetteVector.ttf")
         .expect("Could not load font");
-    //load_rom(&mut machine, "./roms/hello_world.backseat")?;
-    load_rom(&mut machine, "./roms/rom.backseat")?;
     let mut is_halted = false;
     while !raylib_handle.window_should_close() {
         let mut draw_handle = raylib_handle.begin_drawing(&thread);

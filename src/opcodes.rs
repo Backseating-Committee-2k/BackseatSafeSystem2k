@@ -175,6 +175,7 @@ macro_rules! opcodes {
             type Error = &'static str;
 
             fn try_from(value: Instruction) -> Result<Self, Self::Error> {
+                #![allow(clippy::eval_order_dependence)]
                 let opcode = value.as_words().0.as_half_words().0;
                 let register_values = &value.to_be_bytes()[2..];
                 let mut registers = [Register(0); 6];

@@ -274,8 +274,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -301,8 +301,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -328,8 +328,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -355,8 +355,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -382,8 +382,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -409,8 +409,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -437,8 +437,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -465,8 +465,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -493,8 +493,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -523,8 +523,8 @@ mod tests {
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_high], 0);
         assert_eq!(machine.processor.registers[target_low], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -553,8 +553,8 @@ mod tests {
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_high], 0);
         assert_eq!(machine.processor.registers[target_low], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -585,8 +585,8 @@ mod tests {
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_high], high_expected);
         assert_eq!(machine.processor.registers[target_low], low_expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -617,8 +617,8 @@ mod tests {
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_high], high_expected);
         assert_eq!(machine.processor.registers[target_low], low_expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -654,8 +654,8 @@ mod tests {
             machine.processor.registers[target_remainder],
             expected_remainder
         );
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::DivideByZero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::DivideByZero));
     }
 
     #[test]
@@ -691,8 +691,8 @@ mod tests {
             machine.processor.registers[target_remainder],
             expected_remainder
         );
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::DivideByZero), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::DivideByZero));
     }
 
     #[test]
@@ -728,8 +728,8 @@ mod tests {
             machine.processor.registers[target_remainder],
             expected_remainder
         );
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::DivideByZero), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::DivideByZero));
     }
 
     #[test]
@@ -737,9 +737,9 @@ mod tests {
         let lhs_register = 0x42.into();
         let rhs_register = 0x43.into();
         let target_register = 0x0A.into();
-        let lhs: Word = 0b01101110_10011010_01101110_10011010;
-        let rhs = 0b10111010_01011001_10111010_01011001;
-        let expected = 0b00101010_00011000_00101010_00011000;
+        let lhs: Word = 0b0110_1110_1001_1010_0110_1110_1001_1010;
+        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
+        let expected = 0b0010_1010_0001_1000_0010_1010_0001_1000;
         let mut machine = Machine::new();
         machine.processor.set_flag(Flag::Carry, true);
         machine.processor.registers[lhs_register] = lhs;
@@ -756,7 +756,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -764,8 +764,8 @@ mod tests {
         let lhs_register = 0x42.into();
         let rhs_register = 0x43.into();
         let target_register = 0x0A.into();
-        let lhs: Word = 0b01000100_10000110_01000100_10000010;
-        let rhs = 0b10111010_01011001_10111010_01011001;
+        let lhs: Word = 0b0100_0100_1000_0110_0100_0100_1000_0010;
+        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
         let expected = 0;
         let mut machine = Machine::new();
         machine.processor.set_flag(Flag::Carry, true);
@@ -783,7 +783,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -791,9 +791,9 @@ mod tests {
         let lhs_register = 0x42.into();
         let rhs_register = 0x43.into();
         let target_register = 0x0A.into();
-        let lhs: Word = 0b01101110_10011010_01101110_10011010;
-        let rhs = 0b10111010_01011001_10111010_01011001;
-        let expected = 0b11111110_11011011_11111110_11011011;
+        let lhs: Word = 0b0110_1110_1001_1010_0110_1110_1001_1010;
+        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
+        let expected = 0b1111_1110_1101_1011_1111_1110_1101_1011;
         let mut machine = Machine::new();
         machine.processor.set_flag(Flag::Carry, true);
         machine.processor.registers[lhs_register] = lhs;
@@ -810,7 +810,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -837,7 +837,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -845,9 +845,9 @@ mod tests {
         let lhs_register = 0x42.into();
         let rhs_register = 0x43.into();
         let target_register = 0x0A.into();
-        let lhs: Word = 0b01101110_10011010_01101110_10011010;
-        let rhs = 0b10111010_01011001_10111010_01011001;
-        let expected = 0b11010100_11000011_11010100_11000011;
+        let lhs: Word = 0b0110_1110_1001_1010_0110_1110_1001_1010;
+        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
+        let expected = 0b1101_0100_1100_0011_1101_0100_1100_0011;
         let mut machine = Machine::new();
         machine.processor.set_flag(Flag::Carry, true);
         machine.processor.registers[lhs_register] = lhs;
@@ -864,7 +864,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -872,8 +872,8 @@ mod tests {
         let lhs_register = 0x42.into();
         let rhs_register = 0x43.into();
         let target_register = 0x0A.into();
-        let lhs: Word = 0b10111010_10010010_01000100_10010010;
-        let rhs = 0b10111010_10010010_01000100_10010010;
+        let lhs: Word = 0b1011_1010_1001_0010_0100_0100_1001_0010;
+        let rhs = 0b1011_1010_1001_0010_0100_0100_1001_0010;
         let expected = 0;
         let mut machine = Machine::new();
         machine.processor.set_flag(Flag::Carry, true);
@@ -891,7 +891,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -899,12 +899,12 @@ mod tests {
         let mut machine = Machine::new();
         let source = 0x5.into();
         let target = 0x0A.into();
-        let data = 0b00101010_00011000_00101010_00011000;
-        let expected = 0b11010101_11100111_11010101_11100111;
+        let data = 0b0010_1010_0001_1000_0010_1010_0001_1000;
+        let expected = 0b1101_0101_1110_0111_1101_0101_1110_0111;
         machine.processor.registers[source] = data;
         let machine = execute_instruction_with_machine(machine, NotTargetSource { target, source });
         assert_eq!(machine.processor.registers[target], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -917,7 +917,7 @@ mod tests {
         machine.processor.registers[source] = data;
         let machine = execute_instruction_with_machine(machine, NotTargetSource { target, source });
         assert_eq!(machine.processor.registers[target], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -942,8 +942,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -968,8 +968,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -994,8 +994,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1020,8 +1020,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1046,8 +1046,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1072,8 +1072,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1098,8 +1098,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1124,8 +1124,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1150,8 +1150,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1176,8 +1176,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1202,8 +1202,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1225,8 +1225,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1248,8 +1248,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1271,8 +1271,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1294,8 +1294,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1317,8 +1317,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1340,8 +1340,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1363,8 +1363,8 @@ mod tests {
         );
         assert_eq!(machine.processor.registers[source_register], source_value);
         assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), true);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -1390,7 +1390,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -1416,7 +1416,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]
@@ -1442,7 +1442,7 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), true);
+        assert!(machine.processor.get_flag(Flag::Zero));
     }
 
     #[test]

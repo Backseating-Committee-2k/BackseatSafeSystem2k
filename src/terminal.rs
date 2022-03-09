@@ -19,7 +19,7 @@ pub fn render(
         let string: String = words
             .iter()
             .map(|&word| {
-                if word < 32 || word > 255 {
+                if !(32..=255).contains(&word) {
                     b' '
                 } else {
                     word as u8

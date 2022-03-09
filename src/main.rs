@@ -109,9 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
         .build();
-    let font = raylib_handle
-        .load_font(&thread, "./resources/CozetteVector.ttf")
-        .expect("Could not load font");
+    let font = raylib_handle.load_font(&thread, "./resources/CozetteVector.ttf")?;
     let mut is_halted = false;
     while !raylib_handle.window_should_close() {
         let mut draw_handle = raylib_handle.begin_drawing(&thread);

@@ -14,8 +14,8 @@ impl Machine {
         }
     }
 
-    pub fn render(&mut self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
-        terminal::render(&mut self.memory, draw_handle, Vector2::zero(), font, 20.0);
+    pub fn render(&self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
+        terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
     }
 
     pub fn make_tick(&mut self) {
@@ -247,8 +247,8 @@ mod tests {
         assert_eq!(machine.processor.registers[lhs_register], lhs);
         assert_eq!(machine.processor.registers[rhs_register], rhs);
         assert_eq!(machine.processor.registers[target_register], expected);
-        assert_eq!(machine.processor.get_flag(Flag::Zero), false);
-        assert_eq!(machine.processor.get_flag(Flag::Carry), false);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+        assert!(!machine.processor.get_flag(Flag::Carry));
     }
 
     #[test]
@@ -638,7 +638,7 @@ mod tests {
             machine,
             DivmodTargetModLhsRhs {
                 result: target_quotient,
-                reminder: target_remainder,
+                remainder: target_remainder,
                 lhs: lhs_register,
                 rhs: rhs_register,
             },
@@ -675,7 +675,7 @@ mod tests {
             machine,
             DivmodTargetModLhsRhs {
                 result: target_quotient,
-                reminder: target_remainder,
+                remainder: target_remainder,
                 lhs: lhs_register,
                 rhs: rhs_register,
             },
@@ -712,7 +712,7 @@ mod tests {
             machine,
             DivmodTargetModLhsRhs {
                 result: target_quotient,
-                reminder: target_remainder,
+                remainder: target_remainder,
                 lhs: lhs_register,
                 rhs: rhs_register,
             },

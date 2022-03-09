@@ -1,4 +1,4 @@
-use crate::{Address, Instruction, Register, Word};
+use crate::{Address, AsHalfWords, AsWords, Instruction, Register, Word};
 
 macro_rules! type_to_abbreviation {
     (immediate) => {
@@ -170,6 +170,42 @@ macro_rules! opcodes {
                 }
             }
         }
+
+        impl TryFrom<Instruction> for Opcode {
+            type Error = &'static str;
+
+            fn try_from(value: Instruction) -> Result<Self, Self::Error> {
+                let opcode = value.as_words().0.as_half_words().0;
+                let register_values = &value.to_be_bytes()[2..];
+                let mut registers = [Register(0); 6];
+                for (i, register) in registers.iter_mut().enumerate() {
+                    *register = Register(register_values[i]);
+                }
+                let immediate = value.as_words().1;
+                let address = immediate;
+                macro_rules! address_or_immediate {
+                    ( immediate ) => { immediate };
+                    ( address ) => { address };
+                }
+                match opcode {
+                    $(
+                        $code => {
+                            let mut _register_index = 0;
+                            Ok(Self::$identifier{
+                            $(
+                                $register_name: registers[{
+                                    let old_index = _register_index;
+                                    _register_index += 1;
+                                    old_index
+                                }],
+                            )*
+                            $( $type: address_or_immediate!($type) )?
+                        })},
+                    )*
+                    _ => Err("Invalid opcode")
+                }
+            }
+        }
     };
 }
 
@@ -185,7 +221,7 @@ opcodes!(
     { SubtractTargetLhsRhs, 0x0008, register(T target, L lhs, R rhs), "subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
     { SubtractWithCarryTargetLhsRhs, 0x0009, register(T target, L lhs, R rhs), "subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
     { MultiplyHighLowLhsRhs, 0x000A, register(H high, T low, L lhs, R rhs), "multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately" },
-    { DivmodTargetModLhsRhs, 0x000B, register(D result, M reminder, L lhs, R rhs), "divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately" },
+    { DivmodTargetModLhsRhs, 0x000B, register(D result, M remainder, L lhs, R rhs), "divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately" },
     { AndTargetLhsRhs, 0x000C, register(T target, L lhs, R rhs), "and the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
     { OrTargetLhsRhs, 0x000D, register(T target, L lhs, R rhs), "or the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
     { XorTargetLhsRhs, 0x000E, register(T target, L lhs, R rhs), "xor the values in registers LL and RR, store the result in TT, set zero flag appropriately" },

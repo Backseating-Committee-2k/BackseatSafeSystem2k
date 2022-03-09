@@ -50,7 +50,10 @@ pub trait AsHalfWords {
 
 impl AsHalfWords for Word {
     fn as_half_words(&self) -> (HalfWord, HalfWord) {
-        ((self >> 8 * HalfWord::SIZE) as HalfWord, *self as HalfWord)
+        (
+            (self >> (8 * HalfWord::SIZE)) as HalfWord,
+            *self as HalfWord,
+        )
     }
 }
 
@@ -60,7 +63,7 @@ pub trait AsWords {
 
 impl AsWords for Instruction {
     fn as_words(&self) -> (Word, Word) {
-        ((self >> Word::SIZE * 8) as Word, *self as Word)
+        ((self >> (Word::SIZE * 8)) as Word, *self as Word)
     }
 }
 
@@ -105,7 +108,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let font = raylib_handle
         .load_font(&thread, "./resources/CozetteVector.ttf")
         .expect("Could not load font");
-    load_rom(&mut machine, "./roms/hello_world.backseat")?;
+    //load_rom(&mut machine, "./roms/hello_world.backseat")?;
+    load_rom(&mut machine, "./roms/rom.backseat")?;
     let mut is_halted = false;
     while !raylib_handle.window_should_close() {
         let mut draw_handle = raylib_handle.begin_drawing(&thread);

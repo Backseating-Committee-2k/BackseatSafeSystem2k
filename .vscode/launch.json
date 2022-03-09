@@ -25,6 +25,25 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Release executable 'backseat_safe_system_2k'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=backseat_safe_system_2k",
+                    "--package=backseat_safe_system_2k",
+                    "release"
+                ],
+                "filter": {
+                    "name": "backseat_safe_system_2k",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'backseat_safe_system_2k'",
             "cargo": {
                 "args": [

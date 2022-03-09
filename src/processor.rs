@@ -2,9 +2,10 @@
 
 use std::ops::{Index, IndexMut};
 
+use crate::opcodes::Opcode;
+use crate::static_assert;
 use crate::terminal;
 use crate::{memory::Memory, Address, Instruction, Word};
-use crate::{static_assert, AsHalfWords, AsWords};
 use crate::{Register, Size};
 use bitflags::bitflags;
 
@@ -116,173 +117,184 @@ impl Processor {
     }
 
     pub fn make_tick(&mut self, memory: &mut Memory) {
+        use crate::processor::Opcode::*;
         let instruction = memory.read_instruction(self.registers[Self::INSTRUCTION_POINTER]);
-        let opcode = instruction.as_words().0.as_half_words().0;
-        let register_values = &instruction.to_be_bytes()[2..];
-        let mut registers = [Register(0); 6];
-        for (i, register) in registers.iter_mut().enumerate() {
-            *register = Register(register_values[i]);
+        let opcode = Opcode::try_from(instruction);
+        if let Err(err) = opcode {
+            eprintln!("Error making tick: {}", err);
+            return;
         }
-        let constant = instruction.as_words().1;
-        let address = constant;
+        let opcode = opcode.unwrap();
         match opcode {
-            0x0000 => self.registers[registers[0]] = constant,
-            0x0001 => self.registers[registers[0]] = memory.read_data(address),
-            0x0002 => self.registers[registers[0]] = self.registers[registers[1]],
-            0x0003 => memory.write_data(address, self.registers[registers[0]]),
-            0x0004 => self.registers[registers[0]] = memory.read_data(self.registers[registers[1]]),
-            0x0005 => memory.write_data(self.registers[registers[0]], self.registers[registers[1]]),
-            0x0006 => return,
-            0x0007 => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
-                let target = &mut self.registers[registers[0]];
-                let (result, did_overflow) = lhs.overflowing_add(rhs);
-                *target = result;
-                self.set_flag(Flag::Zero, result == 0);
+            MoveRegisterImmediate {
+                register,
+                immediate,
+            } => self.registers[register] = immediate,
+            MoveRegisterAddress { register, address } => {
+                self.registers[register] = memory.read_data(address)
+            }
+            MoveTargetSource { target, source } => self.registers[target] = self.registers[source],
+            MoveAddressRegister { register, address } => {
+                memory.write_data(address, self.registers[register])
+            }
+            MoveTargetPointer { target, pointer } => {
+                self.registers[target] = memory.read_data(self.registers[pointer])
+            }
+            MovePointerSource { pointer, source } => {
+                memory.write_data(self.registers[pointer], self.registers[source]);
+            }
+            HaltAndCatchFire {} => return,
+            AddTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
+                let did_overflow;
+                (self.registers[target], did_overflow) = lhs.overflowing_add(rhs);
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
                 self.set_flag(Flag::Carry, did_overflow);
             }
-            0x0008 => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
-                let target = &mut self.registers[registers[0]];
-                let (result, did_overflow) = lhs.overflowing_sub(rhs);
-                *target = result;
-                self.set_flag(Flag::Zero, result == 0);
+            SubtractTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
+                let did_overflow;
+                (self.registers[target], did_overflow) = lhs.overflowing_sub(rhs);
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
                 self.set_flag(Flag::Carry, did_overflow);
             }
-            0x0009 => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
+            SubtractWithCarryTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
                 let carry_flag_set = self.get_flag(Flag::Carry);
-                let target = &mut self.registers[registers[0]];
-                let (result, did_overflow) = lhs.overflowing_sub(rhs);
-                let (result, did_overflow_after_subtracting_carry) =
-                    result.overflowing_sub(carry_flag_set as _);
-                *target = result;
-                self.set_flag(Flag::Zero, result == 0);
+                let did_overflow;
+                (self.registers[target], did_overflow) = lhs.overflowing_sub(rhs);
+                let did_overflow_after_subtracting_carry;
+                (self.registers[target], did_overflow_after_subtracting_carry) =
+                    self.registers[target].overflowing_sub(carry_flag_set as _);
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
                 self.set_flag(
                     Flag::Carry,
                     did_overflow || did_overflow_after_subtracting_carry,
                 );
             }
-            0x000A => {
-                let lhs = self.registers[registers[2]];
-                let rhs = self.registers[registers[3]];
+            MultiplyHighLowLhsRhs {
+                high,
+                low,
+                lhs,
+                rhs,
+            } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
                 let result = lhs as u64 * rhs as u64;
-                let high_result = (result >> 32) as u32;
-                let low_result = result as u32;
-                self.registers[registers[0]] = high_result;
-                self.registers[registers[1]] = low_result;
-                self.set_flag(Flag::Zero, low_result == 0);
-                self.set_flag(Flag::Carry, high_result > 0);
+                self.registers[high] = (result >> 32) as u32;
+                self.registers[low] = result as u32;
+                self.set_flag(Flag::Zero, self.registers[low] == 0);
+                self.set_flag(Flag::Carry, self.registers[high] > 0);
             }
-            0x000B => {
-                let lhs = self.registers[registers[2]];
-                let rhs = self.registers[registers[3]];
+            DivmodTargetModLhsRhs {
+                result,
+                remainder,
+                lhs,
+                rhs,
+            } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
                 if rhs == 0 {
-                    self.registers[registers[0]] = 0;
-                    self.registers[registers[1]] = lhs;
+                    self.registers[result] = 0;
+                    self.registers[remainder] = lhs;
                     self.set_flag(Flag::Zero, true);
                     self.set_flag(Flag::DivideByZero, true);
                 } else {
-                    let (quotient, remainder) = (lhs / rhs, lhs % rhs);
-                    self.registers[registers[0]] = quotient;
-                    self.registers[registers[1]] = remainder;
-                    self.set_flag(Flag::Zero, quotient == 0);
+                    (self.registers[result], self.registers[remainder]) = (lhs / rhs, lhs % rhs);
+                    self.set_flag(Flag::Zero, self.registers[result] == 0);
                     self.set_flag(Flag::DivideByZero, false);
                 }
             }
-            0x000C => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
-                let result = lhs & rhs;
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
+            AndTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
+                self.registers[target] = lhs & rhs;
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
-            0x000D => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
-                let result = lhs | rhs;
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
+            OrTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
+                self.registers[target] = lhs | rhs;
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
-            0x000E => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
-                let result = lhs ^ rhs;
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
+            XorTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
+                self.registers[target] = lhs ^ rhs;
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
-            0x000F => {
-                let source = self.registers[registers[1]];
-                let result = !source;
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
+            NotTargetSource { target, source } => {
+                self.registers[target] = !self.registers[source];
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
-            0x0010 => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
+            LeftShiftTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
                 if rhs > Word::BITS {
-                    self.registers[registers[0]] = 0;
+                    self.registers[target] = 0;
                     self.set_flag(Flag::Zero, true);
                     self.set_flag(Flag::Carry, lhs > 0);
                 } else {
                     let result = lhs << rhs;
-                    self.registers[registers[0]] = result;
+                    self.registers[target] = result;
                     self.set_flag(Flag::Zero, result == 0);
                     self.set_flag(Flag::Carry, rhs > lhs.leading_zeros());
                 }
             }
-            0x0011 => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
+            RightShiftTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
                 if rhs > Word::BITS {
-                    self.registers[registers[0]] = 0;
+                    self.registers[target] = 0;
                     self.set_flag(Flag::Zero, true);
                     self.set_flag(Flag::Carry, lhs > 0);
                 } else {
                     let result = lhs >> rhs;
-                    self.registers[registers[0]] = result;
+                    self.registers[target] = result;
                     self.set_flag(Flag::Zero, result == 0);
                     self.set_flag(Flag::Carry, rhs > lhs.trailing_zeros());
                 }
             }
-            0x0012 => {
-                let lhs = self.registers[registers[1]];
-                let (result, carry) = lhs.overflowing_add(constant);
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
+            AddTargetSourceImmediate {
+                target,
+                source,
+                immediate,
+            } => {
+                let carry;
+                (self.registers[target], carry) = self.registers[source].overflowing_add(immediate);
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
                 self.set_flag(Flag::Carry, carry);
             }
-            0x0013 => {
-                let lhs = self.registers[registers[1]];
-                let result = lhs.wrapping_sub(constant);
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
-                self.set_flag(Flag::Carry, constant > lhs);
+            SubtractTargetSourceImmediate {
+                target,
+                source,
+                immediate,
+            } => {
+                self.registers[target] = self.registers[source].wrapping_sub(immediate);
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
+                self.set_flag(Flag::Carry, immediate > self.registers[source]);
             }
-            0x0014 => {
-                let lhs = self.registers[registers[1]];
-                let rhs = self.registers[registers[2]];
-                let result = match lhs.cmp(&rhs) {
+            CompareTargetLhsRhs { target, lhs, rhs } => {
+                let lhs = self.registers[lhs];
+                let rhs = self.registers[rhs];
+                self.registers[target] = match lhs.cmp(&rhs) {
                     std::cmp::Ordering::Less => Word::MAX,
                     std::cmp::Ordering::Equal => 0,
                     std::cmp::Ordering::Greater => 1,
                 };
-                self.registers[registers[0]] = result;
-                self.set_flag(Flag::Zero, result == 0);
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
-            0x0015 => {
-                let value = self.registers[registers[0]];
-                memory.write_data(self.get_stack_pointer(), value);
+            PushRegister { register } => {
+                memory.write_data(self.get_stack_pointer(), self.registers[register]);
                 self.advance_stack_pointer(Word::SIZE, Direction::Forwards);
             }
-            0x0016 => {
+            PopRegister { register } => {
                 self.advance_stack_pointer(Word::SIZE, Direction::Backwards);
-                self.registers[registers[0]] = memory.read_data(self.get_stack_pointer());
+                self.registers[register] = memory.read_data(self.get_stack_pointer());
             }
-            _ => panic!("Unknown opcode!"),
         }
         self.advance_instruction_pointer(Direction::Forwards);
     }

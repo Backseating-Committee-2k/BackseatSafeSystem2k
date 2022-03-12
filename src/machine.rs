@@ -47,20 +47,91 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn make_tick_increases_instruction_pointer() {
-        use crate::Size;
-        let mut machine = Machine::new();
-        assert_eq!(
-            machine.processor.registers[Processor::INSTRUCTION_POINTER],
-            Processor::ENTRY_POINT
-        );
-        machine.processor.make_tick(&mut machine.memory);
-        assert_eq!(
-            machine.processor.registers[Processor::INSTRUCTION_POINTER],
-            Processor::ENTRY_POINT + Instruction::SIZE as u32
-        );
+    macro_rules! opcodes_to_machine {
+        () => {
+            Machine::new()
+        };
+        ($opcodes:expr) => {
+            create_machine_with_opcodes($opcodes)
+        };
     }
+
+    macro_rules! create_test {
+        (
+            $test_name:ident,
+            $( setup = { $($setup_tokens:tt)+ }, )?
+            $( opcodes = $opcodes:expr, )?
+            $( registers_pre = [$( $register_pre_value:expr => $register_pre:expr ),+], )?
+            $( flags_pre = [ $( $flag_pre_value:expr => $flag_pre:ident ),+ ],)?
+            $( memory_pre = [$( $memory_pre_value:expr => $memory_pre_address:expr ),+], )?
+            $( registers_post = [$( ($register_post:expr, $register_post_value:expr) ),+], )?
+            $( memory_post = [$( ( $memory_post_address:expr, $memory_post_value:expr ) ),+], )?
+            $( flags_post = [ $( ( $flag_post:ident, $flag_post_value:expr ) ),+], )?
+            $( eq_asserts = [ $( ( $eq_assert_lhs:expr, $eq_assert_rhs:expr ) ),+ ], )?
+        ) => {
+            #[test]
+            fn $test_name() {
+                $(
+                    $(
+                        $setup_tokens
+                    )+
+                )?
+                let mut machine = opcodes_to_machine!($( $opcodes )?);
+                $(
+                    $(
+                        machine.processor.registers[$register_pre.into()] = $register_pre_value;
+                    )+
+                )?
+                $(
+                    $(
+                        machine.processor.set_flag(Flag::$flag_pre, $flag_pre_value);
+                    )+
+                )?
+                $(
+                    $(
+                        machine.memory.write_data($memory_pre_address, $memory_pre_value);
+                    )+
+                )?
+                $(
+                    for _ in 0..$opcodes.len() {
+                        machine.make_tick();
+                    }
+                )?
+                $(
+                    $(
+                        assert_eq!(machine.processor.registers[$register_post], $register_post_value);
+                    )+
+                )?
+                $(
+                    $(
+                        assert_eq!(machine.memory.read_data($memory_post_address), $memory_post_value);
+                    )+
+                )?
+                $(
+                    $(
+                        assert_eq!(machine.processor.get_flag(Flag::$flag_post), $flag_post_value);
+                    )+
+                )?
+                $(
+                    $(
+                        assert_eq!($eq_assert_lhs, $eq_assert_rhs);
+                    )+
+                )?
+            }
+        };
+    }
+
+    create_test!(
+        make_tick_increases_instruction_pointer,
+        opcodes = &[Opcode::MoveRegisterImmediate {
+            register: 0.into(),
+            immediate: 0
+        }],
+        registers_post = [(
+            Processor::INSTRUCTION_POINTER,
+            Processor::ENTRY_POINT + Instruction::SIZE as u32
+        )],
+    );
 
     fn create_machine_with_data_at(address: Address, data: Word) -> Machine {
         let mut machine = Machine::new();
@@ -68,7 +139,7 @@ mod tests {
         machine
     }
 
-    fn create_machine_with_instructions(opcodes: &[Opcode]) -> Machine {
+    fn create_machine_with_opcodes(opcodes: &[Opcode]) -> Machine {
         let mut machine = Machine::new();
         for (&opcode, address) in opcodes
             .iter()
@@ -204,7 +275,7 @@ mod tests {
     fn halt_and_catch_fire_prevents_further_instructions() {
         let register = 0x05.into();
         let value = 0x0000_0042;
-        let mut machine = create_machine_with_instructions(&[
+        let mut machine = create_machine_with_opcodes(&[
             HaltAndCatchFire {},
             MoveRegisterImmediate {
                 register,
@@ -1553,4 +1624,331 @@ mod tests {
             Processor::ENTRY_POINT + Instruction::SIZE as Address
         );
     }
+
+    create_test!(
+        jump_to_address,
+        setup = {
+            let address = Processor::ENTRY_POINT as Address + 42;
+        },
+        opcodes = &[Opcode::JumpAddress { address }],
+        registers_post = [(Processor::INSTRUCTION_POINTER, address)],
+    );
+
+    create_test!(
+        jump_to_pointer,
+        setup = {
+            let register = Register(0xAB);
+            let address = Processor::ENTRY_POINT as Address + 42;
+        },
+        opcodes = &[Opcode::JumpRegister { register }],
+        registers_pre = [address => register],
+        registers_post = [(Processor::INSTRUCTION_POINTER, address)],
+    );
+
+    macro_rules! create_jump_test {
+        ($test_name:ident,
+        $jump_instruction:ident,
+        $lhs:literal,
+        $rhs:literal,
+        $should_jump:literal) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let target_register = 0.into();
+                },
+                opcodes = &[
+                    Opcode::CompareTargetLhsRhs {
+                        target: target_register,
+                        lhs: 1.into(),
+                        rhs: 2.into(),
+                    },
+                    Opcode::$jump_instruction {
+                        register: target_register,
+                        address: target_address,
+                    },
+                ],
+                registers_pre = [$lhs => 1, $rhs => 2],
+                registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
+                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                })],
+            );
+        };
+    }
+
+    create_jump_test!(
+        jump_to_address_if_equal_that_jumps,
+        JumpAddressIfEqual,
+        42,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_equal_that_does_not_jump,
+        JumpAddressIfEqual,
+        42,
+        43,
+        false
+    );
+
+    create_jump_test!(
+        jump_to_address_if_greater_than_that_jumps,
+        JumpAddressIfGreaterThan,
+        43,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_greater_than_that_does_not_jump_01,
+        JumpAddressIfGreaterThan,
+        42,
+        43,
+        false
+    );
+
+    create_jump_test!(
+        jump_to_address_if_greater_than_that_does_not_jump_02,
+        JumpAddressIfGreaterThan,
+        42,
+        42,
+        false
+    );
+
+    create_jump_test!(
+        jump_to_address_if_less_than_that_jumps,
+        JumpAddressIfLessThan,
+        41,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_less_than_that_does_not_jump_01,
+        JumpAddressIfLessThan,
+        43,
+        42,
+        false
+    );
+
+    create_jump_test!(
+        jump_to_address_if_less_than_that_does_not_jump_02,
+        JumpAddressIfLessThan,
+        42,
+        42,
+        false
+    );
+
+    create_jump_test!(
+        jump_to_address_if_less_than_or_equal_that_jumps_01,
+        JumpAddressIfLessThanOrEqual,
+        41,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_less_than_or_equal_that_jumps_02,
+        JumpAddressIfLessThanOrEqual,
+        42,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_less_than_or_equal_that_does_not_jump,
+        JumpAddressIfLessThanOrEqual,
+        43,
+        42,
+        false
+    );
+
+    create_jump_test!(
+        jump_to_address_if_greater_than_or_equal_that_jumps_01,
+        JumpAddressIfGreaterThanOrEqual,
+        43,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_greater_than_or_equal_that_jumps_02,
+        JumpAddressIfGreaterThanOrEqual,
+        42,
+        42,
+        true
+    );
+
+    create_jump_test!(
+        jump_to_address_if_greater_than_or_equal_that_does_not_jump,
+        JumpAddressIfGreaterThanOrEqual,
+        41,
+        42,
+        false
+    );
+
+    macro_rules! create_jump_flag_test(
+        (
+            $test_name:ident,
+            $jump_instruction:ident,
+            $lhs:expr,
+            $rhs:expr,
+            $should_jump:literal
+        ) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let high_register = 3.into();
+                    let target_register = 0.into();
+                },
+                opcodes = &[
+                    Opcode::MultiplyHighLowLhsRhs {
+                        high: high_register,
+                        low: target_register,
+                        lhs: 1.into(),
+                        rhs: 2.into(),
+                    },
+                    Opcode::$jump_instruction {
+                        address: target_address,
+                    },
+                ],
+                registers_pre = [$lhs => 1, $rhs => 2],
+                registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
+                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                })],
+            );
+        }
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_zero_flag_set_that_jumps,
+        JumpAddressIfZero,
+        5,
+        0,
+        true
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_zero_flag_set_that_does_not_jump,
+        JumpAddressIfZero,
+        5,
+        2,
+        false
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_zero_flag_not_set_that_jumps,
+        JumpAddressIfNotZero,
+        5,
+        3,
+        true
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_zero_flag_not_set_that_does_not_jump,
+        JumpAddressIfNotZero,
+        5,
+        0,
+        false
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_carry_flag_set_that_jumps,
+        JumpAddressIfCarry,
+        Word::MAX,
+        2,
+        true
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_carry_flag_set_that_does_not_jump,
+        JumpAddressIfCarry,
+        5,
+        2,
+        false
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_carry_flag_not_set_that_jumps,
+        JumpAddressIfNotCarry,
+        5,
+        3,
+        true
+    );
+
+    create_jump_flag_test!(
+        jump_to_address_if_carry_flag_not_set_that_does_not_jump,
+        JumpAddressIfNotCarry,
+        2,
+        Word::MAX,
+        false
+    );
+
+    macro_rules! create_jump_divmod_test {
+        (
+            $test_name:ident,
+            $jump_instruction:ident,
+            $lhs:expr,
+            $rhs:expr,
+            $should_jump:literal
+        ) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let remainder_register = 3.into();
+                    let target_register = 0.into();
+                },
+                opcodes = &[
+                    Opcode::DivmodTargetModLhsRhs {
+                        result: target_register,
+                        remainder: remainder_register,
+                        lhs: 1.into(),
+                        rhs: 2.into(),
+                    },
+                    Opcode::$jump_instruction {
+                        address: target_address,
+                    },
+                ],
+                registers_pre = [$lhs => 1, $rhs => 2],
+                registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
+                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                })],
+            );
+        };
+    }
+
+    create_jump_divmod_test!(
+        jump_to_address_if_divide_by_zero_flag_set_that_jumps,
+        JumpAddressIfDivideByZero,
+        5,
+        0,
+        true
+    );
+
+    create_jump_divmod_test!(
+        jump_to_address_if_divide_by_zero_flag_set_that_does_not_jump,
+        JumpAddressIfDivideByZero,
+        5,
+        2,
+        false
+    );
+
+    create_jump_divmod_test!(
+        jump_to_address_if_divide_by_zero_flag_not_set_that_jumps,
+        JumpAddressIfNotDivideByZero,
+        5,
+        3,
+        true
+    );
+
+    create_jump_divmod_test!(
+        jump_to_address_if_divide_by_zero_flag_not_set_that_does_not_jump,
+        JumpAddressIfNotDivideByZero,
+        2,
+        0,
+        false
+    );
 }

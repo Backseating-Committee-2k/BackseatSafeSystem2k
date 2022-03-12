@@ -110,17 +110,21 @@ impl Processor {
         memory.read_data(self.get_stack_pointer())
     }
 
-    fn set_instruction_pointer(&mut self, address: Address) {
+    pub fn set_instruction_pointer(&mut self, address: Address) {
         self.registers[Self::INSTRUCTION_POINTER] = address;
     }
 
-    fn advance_instruction_pointer(&mut self, direction: Direction) {
+    pub fn get_instruction_pointer(&self) -> Address {
+        self.registers[Self::INSTRUCTION_POINTER]
+    }
+
+    pub fn advance_instruction_pointer(&mut self, direction: Direction) {
         match direction {
             Direction::Forwards => self.set_instruction_pointer(
-                self.registers[Self::INSTRUCTION_POINTER] + Instruction::SIZE as Address,
+                self.get_instruction_pointer() + Instruction::SIZE as Address,
             ),
             Direction::Backwards => self.set_instruction_pointer(
-                self.registers[Self::INSTRUCTION_POINTER]
+                self.get_instruction_pointer()
                     .saturating_sub(Instruction::SIZE as Address),
             ),
         }
@@ -128,7 +132,7 @@ impl Processor {
 
     pub fn make_tick(&mut self, memory: &mut Memory) {
         use crate::processor::Opcode::*;
-        let opcode = memory.read_opcode(self.registers[Self::INSTRUCTION_POINTER]);
+        let opcode = memory.read_opcode(self.get_instruction_pointer());
         if let Err(err) = opcode {
             eprintln!("Error making tick: {}", err);
             return;
@@ -152,7 +156,7 @@ impl Processor {
             MovePointerSource { pointer, source } => {
                 memory.write_data(self.registers[pointer], self.registers[source]);
             }
-            HaltAndCatchFire {} => return,
+            HaltAndCatchFire {} => {}
             AddTargetLhsRhs { target, lhs, rhs } => {
                 let lhs = self.registers[lhs];
                 let rhs = self.registers[rhs];
@@ -305,17 +309,79 @@ impl Processor {
             CallAddress { address } => {
                 self.stack_push(
                     memory,
-                    self.registers[Self::INSTRUCTION_POINTER] + Instruction::SIZE as Address,
+                    self.get_instruction_pointer() + Instruction::SIZE as Address,
                 );
                 self.set_instruction_pointer(address);
-                return; // to prevent advancing the instruction pointer after the match expression
             }
             Return {} => {
                 let return_address = self.stack_pop(memory);
                 self.set_instruction_pointer(return_address);
-                return; // to prevent advancing the instruction pointer after the match expression
             }
+            JumpAddress { address } => {
+                self.set_instruction_pointer(address);
+            }
+            JumpRegister { register } => {
+                self.set_instruction_pointer(self.registers[register]);
+            }
+            JumpAddressIfEqual { register, address } => match self.registers[register] {
+                0 => self.set_instruction_pointer(address),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfGreaterThan { register, address } => match self.registers[register] {
+                1 => self.set_instruction_pointer(address),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfLessThan { register, address } => match self.registers[register] {
+                Word::MAX => self.set_instruction_pointer(address),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfGreaterThanOrEqual { register, address } => match self.registers[register]
+            {
+                1 | 0 => self.set_instruction_pointer(address),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfLessThanOrEqual { register, address } => match self.registers[register] {
+                Word::MAX | 0 => self.set_instruction_pointer(address),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfZero { address } => match self.get_flag(Flag::Zero) {
+                true => self.set_instruction_pointer(address),
+                false => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfNotZero { address } => match self.get_flag(Flag::Zero) {
+                false => self.set_instruction_pointer(address),
+                true => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfCarry { address } => match self.get_flag(Flag::Carry) {
+                true => self.set_instruction_pointer(address),
+                false => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfNotCarry { address } => match self.get_flag(Flag::Carry) {
+                false => self.set_instruction_pointer(address),
+                true => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfDivideByZero { address } => match self.get_flag(Flag::DivideByZero) {
+                true => self.set_instruction_pointer(address),
+                false => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpAddressIfNotDivideByZero { address } => match self.get_flag(Flag::DivideByZero) {
+                false => self.set_instruction_pointer(address),
+                true => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfEqual { register, address } => todo!(),
+            JumpRegisterIfGreaterThan { register, address } => todo!(),
+            JumpRegisterIfLessThan { register, address } => todo!(),
+            JumpRegisterIfGreaterThanOrEqual { register, address } => todo!(),
+            JumpRegisterIfLessThanOrEqual { register, address } => todo!(),
+            JumpRegisterIfZero { address } => todo!(),
+            JumpRegisterIfNotZero { address } => todo!(),
+            JumpRegisterIfCarry { address } => todo!(),
+            JumpRegisterIfNotCarry { address } => todo!(),
+            JumpRegisterIfDivideByZero { address } => todo!(),
+            JumpRegisterIfNotDivideByZero { address } => todo!(),
         }
-        self.advance_instruction_pointer(Direction::Forwards);
+        if opcode.should_increment_instruction_pointer() {
+            self.advance_instruction_pointer(Direction::Forwards);
+        }
     }
 }

@@ -121,18 +121,6 @@ mod tests {
         };
     }
 
-    create_test!(
-        make_tick_increases_instruction_pointer,
-        opcodes = &[Opcode::MoveRegisterImmediate {
-            register: 0.into(),
-            immediate: 0
-        }],
-        registers_post = [(
-            Processor::INSTRUCTION_POINTER,
-            Processor::ENTRY_POINT + Instruction::SIZE as u32
-        )],
-    );
-
     fn create_machine_with_data_at(address: Address, data: Word) -> Machine {
         let mut machine = Machine::new();
         machine.memory.write_data(address, data);
@@ -165,27 +153,42 @@ mod tests {
         execute_instruction_with_machine(Machine::new(), opcode)
     }
 
-    #[test]
-    fn move_constant_into_register() {
-        let register = 0x0A.into();
-        let value = 0xABCD_1234;
-        let machine = execute_instruction(MoveRegisterImmediate {
+    create_test!(
+        make_tick_increases_instruction_pointer,
+        opcodes = &[Opcode::MoveRegisterImmediate {
+            register: 0.into(),
+            immediate: 0
+        }],
+        registers_post = [(
+            Processor::INSTRUCTION_POINTER,
+            Processor::ENTRY_POINT + Instruction::SIZE as u32
+        )],
+    );
+
+    create_test!(
+        move_constant_into_register,
+        setup = {
+            let register = 0x0A.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MoveRegisterImmediate {
             register,
             immediate: value,
-        });
-        assert_eq!(machine.processor.registers[register], value);
-    }
+        }],
+        registers_post = [(register, value)],
+    );
 
-    #[test]
-    fn move_from_address_into_register() {
-        let address = 0xF0;
-        let data = 0xABCD_1234;
-        let register = 0x0A.into();
-        let machine = create_machine_with_data_at(address, data);
-        let machine =
-            execute_instruction_with_machine(machine, MoveRegisterAddress { register, address });
-        assert_eq!(machine.processor.registers[register], data);
-    }
+    create_test!(
+        move_from_address_into_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABCD_1234;
+            let register = 0x0A.into();
+        },
+        opcodes = &[MoveRegisterAddress { register, address }],
+        memory_pre = [data => address],
+        registers_post = [(register, data)],
+    );
 
     #[test]
     fn move_from_one_register_to_another() {
@@ -199,343 +202,256 @@ mod tests {
         assert_eq!(machine.processor.registers[target], data);
     }
 
-    #[test]
-    fn move_from_register_into_memory() {
-        let mut machine = Machine::new();
-        let register = 0x5.into();
-        let data = 0xC0FFEE;
-        let address = 0xF0;
-        machine.processor.registers[register] = data;
-        let machine =
-            execute_instruction_with_machine(machine, MoveAddressRegister { address, register });
-        assert_eq!(machine.memory.read_data(address), data);
-    }
+    create_test!(
+        move_from_register_into_memory,
+        setup = {
+            let register = Register(5);
+            let data = 0xC0FFEE;
+            let address = 0xF0;
+        },
+        opcodes = &[MoveAddressRegister { address, register }],
+        registers_pre = [data => register],
+        memory_post = [(address, data)],
+    );
 
-    #[test]
-    fn move_from_memory_addressed_by_register_into_another_register() {
-        let address = 0xF0;
-        let data = 0xC0FFEE;
-        let target = 0x0A.into();
-        let pointer = 0x05.into();
-        let mut machine = create_machine_with_data_at(address, data);
-        machine.processor.registers[pointer] = address;
-        let machine =
-            execute_instruction_with_machine(machine, MoveTargetPointer { target, pointer });
-        assert_eq!(machine.processor.registers[target], data);
-    }
+    create_test!(
+        move_from_memory_addressed_by_register_into_another_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xC0FFEE;
+            let target = 0x0A.into();
+            let pointer = 0x05.into();
+        },
+        opcodes = &[MoveTargetPointer { target, pointer }],
+        registers_pre = [address => pointer],
+        memory_pre = [data => address],
+        registers_post = [(target, data)],
+    );
 
-    #[test]
-    fn move_from_memory_addressed_by_register_into_same_register() {
-        let address = 0xF0;
-        let data = 0xC0FFEE;
-        let register = 0x05.into();
-        let mut machine = create_machine_with_data_at(address, data);
-        machine.processor.registers[register] = address;
-        let machine = execute_instruction_with_machine(
-            machine,
-            MoveTargetPointer {
-                target: register,
-                pointer: register,
-            },
-        );
-        assert_eq!(machine.processor.registers[register], data);
-    }
+    create_test!(
+        move_from_memory_addressed_by_register_into_same_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xC0FFEE;
+            let register = 0x05.into();
+        },
+        opcodes = &[MoveTargetPointer {
+            target: register,
+            pointer: register,
+        }],
+        registers_pre = [address => register],
+        memory_pre = [data => address],
+        registers_post = [(register, data)],
+    );
 
-    #[test]
-    fn move_from_register_into_memory_addressed_by_another_register() {
-        let data = 0xC0FFEE;
-        let address = 0xF0;
-        let pointer = 0x0A.into();
-        let source = 0x05.into();
-        let mut machine = Machine::new();
-        machine.processor.registers[source] = data;
-        machine.processor.registers[pointer] = address;
-        let machine =
-            execute_instruction_with_machine(machine, MovePointerSource { pointer, source });
-        assert_eq!(machine.memory.read_data(address), data);
-    }
+    create_test!(
+        move_from_register_into_memory_addressed_by_another_register,
+        setup = {
+            let data = 0xC0FFEE;
+            let address = 0xF0;
+            let pointer = 0x0A.into();
+            let source = 0x05.into();
+        },
+        opcodes = &[MovePointerSource { pointer, source }],
+        registers_pre = [data => source, address => pointer],
+        memory_post = [(address, data)],
+    );
 
-    #[test]
-    fn move_from_register_into_memory_addressed_by_same_register() {
-        let address = 0xF0;
-        let register = 0x05.into();
-        let mut machine = Machine::new();
-        machine.processor.registers[register] = address;
-        let machine = execute_instruction_with_machine(
-            machine,
-            MovePointerSource {
-                pointer: register,
-                source: register,
-            },
-        );
-        assert_eq!(machine.memory.read_data(address), address);
-    }
+    create_test!(
+        move_from_register_into_memory_addressed_by_same_register,
+        setup = {
+            let address = 0xF0;
+            let register = 0x05.into();
+        },
+        opcodes = &[MovePointerSource { pointer: register, source: register }],
+        registers_pre = [address => register],
+        memory_post = [(address, address)],
+    );
 
-    #[test]
-    fn halt_and_catch_fire_prevents_further_instructions() {
-        let register = 0x05.into();
-        let value = 0x0000_0042;
-        let mut machine = create_machine_with_opcodes(&[
+    create_test!(
+        halt_and_catch_fire_prevents_further_instructions,
+        setup = {
+            let register = 0x05.into();
+            let value = 0x0000_0042;
+        },
+        opcodes = &[
             HaltAndCatchFire {},
             MoveRegisterImmediate {
                 register,
                 immediate: value,
-            },
-        ]);
-        for _ in 0..2 {
-            machine.make_tick();
-        }
-        assert_eq!(
-            machine.processor.registers[Processor::INSTRUCTION_POINTER],
-            Processor::ENTRY_POINT
-        );
-        assert_eq!(machine.processor.registers[register], 0x0);
+            }
+        ],
+        registers_post = [
+            (Processor::INSTRUCTION_POINTER, Processor::ENTRY_POINT),
+            (register, 0x0)
+        ],
+    );
+
+    macro_rules! create_addition_test{
+        (
+            $test_name:ident,
+            $lhs:expr,
+            $rhs:expr,
+            zero = $zero:literal,
+            carry = $carry:literal
+        ) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let lhs_register = 0x42.into();
+                    let rhs_register = 0x43.into();
+                    let target_register = 0x0A.into();
+                    let lhs: Word = $lhs;
+                    let rhs = $rhs;
+                    let expected = lhs.wrapping_add(rhs);
+                },
+                opcodes = &[AddTargetLhsRhs {
+                    target: target_register,
+                    lhs: lhs_register,
+                    rhs: rhs_register,
+                }],
+                registers_pre = [lhs => lhs_register, rhs => rhs_register],
+                registers_post = [
+                    (lhs_register, lhs),
+                    (rhs_register, rhs),
+                    (target_register, expected)
+                ],
+                flags_post = [(Zero, $zero), (Carry, $carry)],
+            );
+        };
     }
 
-    #[test]
-    fn add_two_values_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 10;
-        let rhs = 12;
-        let expected = lhs + rhs;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            AddTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
+    create_addition_test!(
+        add_two_values_with_no_flags_set,
+        10,
+        12,
+        zero = false,
+        carry = false
+    );
+
+    create_addition_test!(
+        add_two_values_with_only_zero_flag_set,
+        0,
+        0,
+        zero = true,
+        carry = false
+    );
+
+    create_addition_test!(
+        add_two_values_with_only_carry_flag_set,
+        Word::MAX,
+        5,
+        zero = false,
+        carry = true
+    );
+
+    create_addition_test!(
+        add_two_values_with_both_zero_and_carry_flags_set,
+        Word::MAX,
+        1,
+        zero = true,
+        carry = true
+    );
+
+    macro_rules! create_subtraction_test{
+        (
+            $test_name:ident,
+            $lhs:expr,
+            $rhs:expr,
+            zero = $zero:literal,
+            carry = $carry:literal
+        ) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let lhs_register = 0x42.into();
+                    let rhs_register = 0x43.into();
+                    let target_register = 0x0A.into();
+                    let lhs: Word = $lhs;
+                    let rhs = $rhs;
+                    let expected = lhs.wrapping_sub(rhs);
+                },
+                opcodes = &[SubtractTargetLhsRhs {
+                    target: target_register,
+                    lhs: lhs_register,
+                    rhs: rhs_register,
+                }],
+                registers_pre = [lhs => lhs_register, rhs => rhs_register],
+                registers_post = [
+                    (lhs_register, lhs),
+                    (rhs_register, rhs),
+                    (target_register, expected)
+                ],
+                flags_post = [(Zero, $zero), (Carry, $carry)],
+            );
+        };
     }
 
-    #[test]
-    fn add_two_values_with_only_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 0;
-        let rhs = 0;
-        let expected = lhs + rhs;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            AddTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
+    create_subtraction_test!(
+        subtract_two_values_with_no_flags_set,
+        10,
+        8,
+        zero = false,
+        carry = false
+    );
 
-    #[test]
-    fn add_two_values_with_only_carry_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = Word::MAX;
-        let rhs = 5;
-        let expected = lhs.wrapping_add(rhs);
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            AddTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
+    create_subtraction_test!(
+        subtract_two_values_with_only_zero_flag_set,
+        10,
+        10,
+        zero = true,
+        carry = false
+    );
 
-    #[test]
-    fn add_two_values_with_both_zero_and_carry_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = Word::MAX;
-        let rhs = 1;
-        let expected = lhs.wrapping_add(rhs);
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            AddTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
+    create_subtraction_test!(
+        subtract_two_values_with_only_carry_flag_set,
+        10,
+        12,
+        zero = false,
+        carry = true
+    );
 
-    #[test]
-    fn subtract_two_values_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 10;
-        let rhs = 8;
-        let expected = lhs - rhs;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            SubtractTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
+    create_test!(
+        subtract_two_values_with_carry_with_no_flags_set,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_register = 0x0A.into();
+            let lhs: Word = 14;
+            let rhs = 12;
+            let expected = lhs.wrapping_sub(rhs + 1 /* carry */);
+        },
+        opcodes = &[SubtractWithCarryTargetLhsRhs {
+            target: target_register,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        flags_pre = [true => Carry],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_register, expected)],
+        flags_post = [(Zero, false), (Carry, false)],
+    );
 
-    #[test]
-    fn subtract_two_values_with_only_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 10;
-        let rhs = 10;
-        let expected = lhs - rhs;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            SubtractTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn subtract_two_values_with_only_carry_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 10;
-        let rhs = 12;
-        let expected = lhs.wrapping_sub(rhs);
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            SubtractTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn subtract_two_values_with_carry_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 14;
-        let rhs = 12;
-        let expected = lhs.wrapping_sub(rhs + 1 /* carry */);
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            SubtractWithCarryTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn subtract_two_values_with_carry_with_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 14;
-        let rhs = 13;
-        let expected = lhs.wrapping_sub(rhs + 1 /* carry */);
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            SubtractWithCarryTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
+    create_test!(
+        subtract_two_values_with_carry_with_zero_flag_set,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_register = 0x0A.into();
+            let lhs: Word = 14;
+            let rhs = 13;
+            let expected = lhs.wrapping_sub(rhs + 1 /* carry */);
+        },
+        opcodes = &[SubtractWithCarryTargetLhsRhs {
+            target: target_register,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        flags_pre = [true => Carry],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_register, expected)],
+        flags_post = [(Zero, true), (Carry, false)],
+    );
 
     #[test]
     fn subtract_two_values_with_carry_with_both_carry_and_zero_flags_set() {

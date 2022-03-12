@@ -154,7 +154,7 @@ macro_rules! opcodes {
         $(
             #[doc = concat!(" | `", stringify!($code), "\u{00a0}", stringify_registers!(($( $register_letter ),*) $(, $type)?), "` | ", $comment, " |")]
         )+
-        #[derive(Clone, Copy, Debug)]
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         pub enum Opcode {
             $(
                 $identifier{ $( $register_name : Register, )* $($type : type_to_datatype!($type))? },
@@ -234,4 +234,6 @@ opcodes!(
     { CompareTargetLhsRhs, 0x0014, register(T target, L lhs, R rhs), "compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately" },
     { PushRegister, 0x0015, register(R register), "push the value of register RR onto the stack" },
     { PopRegister, 0x0016, register(R register), "pop from the stack and store the value in register RR" },
+    { CallAddress, 0x0017, register(), address, "push the current instruction pointer onto the stack and jump to the specified address" },
+    { Return, 0x0018, register(), "pop the return address from the stack and jump to it" },
 );

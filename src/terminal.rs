@@ -1,11 +1,10 @@
 // featuring Tom Hanks
 
-use crate::{memory::Memory, Address};
+use crate::memory::Memory;
 use raylib::prelude::*;
 
 pub const WIDTH: usize = 80;
 pub const HEIGHT: usize = 25;
-pub const MEMORY_OFFSET: Address = 0x0;
 
 pub fn render(
     memory: &Memory,

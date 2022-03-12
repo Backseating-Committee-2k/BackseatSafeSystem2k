@@ -1,4 +1,4 @@
-use crate::{memory::Memory, processor::Processor, terminal, Instruction, Size, OPCODE_LENGTH};
+use crate::{memory::Memory, opcodes::Opcode, processor::Processor, terminal, Instruction};
 use raylib::prelude::*;
 
 pub struct Machine {
@@ -24,14 +24,15 @@ impl Machine {
 
     #[must_use = "Am I a joke to you?"]
     pub fn is_halted(&self) -> bool {
-        let instruction = self.read_instruction_at_instruction_pointer();
-        let bitmask = !(Instruction::MAX >> OPCODE_LENGTH);
-        (instruction & bitmask) >> (Instruction::SIZE * 8 - OPCODE_LENGTH) == 0x0006
+        let opcode = self.read_opcode_at_instruction_pointer();
+        matches!(opcode, Ok(Opcode::HaltAndCatchFire {}))
     }
 
-    fn read_instruction_at_instruction_pointer(&self) -> Instruction {
+    fn read_opcode_at_instruction_pointer(
+        &self,
+    ) -> Result<Opcode, <Opcode as TryFrom<Instruction>>::Error> {
         self.memory
-            .read_instruction(self.processor.registers[Processor::INSTRUCTION_POINTER])
+            .read_opcode(self.processor.registers[Processor::INSTRUCTION_POINTER])
     }
 }
 
@@ -73,18 +74,14 @@ mod tests {
             .iter()
             .zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
         {
-            machine
-                .memory
-                .write_instruction(address, opcode.as_instruction());
+            machine.memory.write_opcode(address, opcode);
         }
         machine
     }
 
     fn execute_instruction_with_machine(mut machine: Machine, opcode: Opcode) -> Machine {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
-        machine
-            .memory
-            .write_instruction(instruction_pointer, opcode.as_instruction());
+        machine.memory.write_opcode(instruction_pointer, opcode);
         machine.processor.make_tick(&mut machine.memory);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
@@ -1506,6 +1503,54 @@ mod tests {
         assert_eq!(
             machine.processor.get_stack_pointer(),
             Processor::STACK_START
+        );
+    }
+
+    #[test]
+    fn call_and_return() {
+        let mut machine = Machine::new();
+        let call_address = Processor::ENTRY_POINT + 200 * Instruction::SIZE as Address;
+        machine.memory.write_opcode(
+            Processor::ENTRY_POINT,
+            Opcode::CallAddress {
+                address: call_address,
+            },
+        );
+        let target_register = Register(0xAB);
+        let value = 42;
+        machine.memory.write_opcode(
+            call_address,
+            Opcode::MoveRegisterImmediate {
+                register: target_register,
+                immediate: value,
+            },
+        );
+        machine.memory.write_opcode(
+            call_address + Instruction::SIZE as Address,
+            Opcode::Return {},
+        );
+
+        machine.make_tick(); // jump into subroutine
+        assert_eq!(
+            machine.memory.read_data(Processor::STACK_START),
+            Processor::ENTRY_POINT + Instruction::SIZE as Address
+        );
+        assert_eq!(
+            machine.processor.registers[Processor::INSTRUCTION_POINTER],
+            call_address
+        );
+
+        machine.make_tick(); // write value into register
+        assert_eq!(machine.processor.registers[target_register], value);
+        assert_eq!(
+            machine.processor.registers[Processor::INSTRUCTION_POINTER],
+            call_address + Instruction::SIZE as Address
+        );
+
+        machine.make_tick(); // jump back from subroutine
+        assert_eq!(
+            machine.processor.registers[Processor::INSTRUCTION_POINTER],
+            Processor::ENTRY_POINT + Instruction::SIZE as Address
         );
     }
 }

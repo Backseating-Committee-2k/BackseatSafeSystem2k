@@ -1,4 +1,4 @@
-use crate::{Address, Instruction, Size, Word};
+use crate::{opcodes::Opcode, Address, Instruction, Size, Word};
 use std::ops::Range;
 
 pub struct Memory {
@@ -19,23 +19,27 @@ impl Memory {
         address as usize / Address::SIZE
     }
 
-    pub fn read_instruction(&self, address: Address) -> Instruction {
+    pub fn read_opcode(
+        &self,
+        address: Address,
+    ) -> Result<Opcode, <Opcode as TryFrom<Instruction>>::Error> {
         debug_assert!(address as usize % Instruction::SIZE == 0);
         let word_index = Self::address_to_word_index(address);
         let slice = &self.data[word_index..][..Instruction::SIZE / Word::SIZE];
-        let mut result = 0;
+        let mut instruction = 0;
         for &word in slice {
-            result = (result << (8 * Word::SIZE)) | word as Instruction;
+            instruction = (instruction << (8 * Word::SIZE)) | word as Instruction;
         }
-        result
+        instruction.try_into()
     }
 
     pub fn read_data(&self, address: Address) -> Word {
         self.data[Self::address_to_word_index(address)]
     }
 
-    pub fn write_instruction(&mut self, address: Address, mut instruction: Instruction) {
+    pub fn write_opcode(&mut self, address: Address, opcode: Opcode) {
         debug_assert!(address as usize % Instruction::SIZE == 0);
+        let mut instruction = opcode.as_instruction();
         let word_index = Self::address_to_word_index(address);
         let bit_mask = Word::MAX as Instruction;
         for index in (word_index..word_index + Instruction::SIZE / Word::SIZE).rev() {
@@ -68,15 +72,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::Register;
+
     use super::*;
 
     #[test]
     fn write_instruction_read_back() {
         let mut memory = Memory::new();
-        let instruction = 0xFFFFFFFFFFFFFFFF;
         let address = 0x0;
-        memory.write_instruction(address, instruction);
-        assert_eq!(memory.read_instruction(address), instruction);
+        let opcode = Opcode::MoveRegisterImmediate {
+            register: Register(0),
+            immediate: 42,
+        };
+        memory.write_opcode(address, opcode);
+        assert_eq!(memory.read_opcode(address), Ok(opcode));
     }
 
     #[test]
@@ -93,17 +102,16 @@ mod tests {
         let mut memory = Memory::new();
 
         // fill memory
-        let mut instruction = 0x0;
+        let opcode = Opcode::MoveRegisterImmediate {
+            register: Register(0),
+            immediate: 42,
+        };
         for address in (0..Memory::SIZE).step_by(Instruction::SIZE) {
-            memory.write_instruction(address as Address, instruction);
-            instruction = instruction.wrapping_add(1);
+            memory.write_opcode(address as Address, opcode);
         }
 
-        // read back memory
-        instruction = 0x0;
         for address in (0..Memory::SIZE).step_by(Instruction::SIZE) {
-            assert_eq!(memory.read_instruction(address as Address), instruction);
-            instruction = instruction.wrapping_add(1);
+            assert_eq!(memory.read_opcode(address as Address), Ok(opcode));
         }
     }
 

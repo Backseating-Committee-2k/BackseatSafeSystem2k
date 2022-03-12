@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 mod machine;
 mod memory;
 mod opcodes;
@@ -33,7 +31,7 @@ pub type Word = u32;
 pub type HalfWord = u16;
 pub type Address = u32;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Register(pub u8);
 
 impl From<u8> for Register {
@@ -78,7 +76,10 @@ impl Size for HalfWord {}
 fn save_instructions(machine: &mut Machine, instructions: &[Instruction]) {
     let mut address = Processor::ENTRY_POINT;
     for &instruction in instructions {
-        machine.memory.write_instruction(address, instruction);
+        machine.memory.write_opcode(
+            address,
+            instruction.try_into().expect("Invalid instruction"),
+        );
         address += Instruction::SIZE as Address;
     }
 }
@@ -94,7 +95,10 @@ fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box
     for (instruction, address) in
         iterator.zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
     {
-        machine.memory.write_instruction(address, instruction);
+        machine.memory.write_opcode(
+            address,
+            instruction.try_into().expect("Invalid instruction"),
+        );
     }
     Ok(())
 }

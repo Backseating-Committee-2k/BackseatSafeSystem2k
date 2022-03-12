@@ -100,6 +100,16 @@ impl Processor {
         }
     }
 
+    pub fn stack_push(&mut self, memory: &mut Memory, value: Word) {
+        memory.write_data(self.get_stack_pointer(), value);
+        self.advance_stack_pointer(Word::SIZE, Direction::Forwards);
+    }
+
+    pub fn stack_pop(&mut self, memory: &mut Memory) -> Word {
+        self.advance_stack_pointer(Word::SIZE, Direction::Backwards);
+        memory.read_data(self.get_stack_pointer())
+    }
+
     fn set_instruction_pointer(&mut self, address: Address) {
         self.registers[Self::INSTRUCTION_POINTER] = address;
     }
@@ -118,8 +128,7 @@ impl Processor {
 
     pub fn make_tick(&mut self, memory: &mut Memory) {
         use crate::processor::Opcode::*;
-        let instruction = memory.read_instruction(self.registers[Self::INSTRUCTION_POINTER]);
-        let opcode = Opcode::try_from(instruction);
+        let opcode = memory.read_opcode(self.registers[Self::INSTRUCTION_POINTER]);
         if let Err(err) = opcode {
             eprintln!("Error making tick: {}", err);
             return;
@@ -288,12 +297,23 @@ impl Processor {
                 self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
             PushRegister { register } => {
-                memory.write_data(self.get_stack_pointer(), self.registers[register]);
-                self.advance_stack_pointer(Word::SIZE, Direction::Forwards);
+                self.stack_push(memory, self.registers[register]);
             }
             PopRegister { register } => {
-                self.advance_stack_pointer(Word::SIZE, Direction::Backwards);
-                self.registers[register] = memory.read_data(self.get_stack_pointer());
+                self.registers[register] = self.stack_pop(memory);
+            }
+            CallAddress { address } => {
+                self.stack_push(
+                    memory,
+                    self.registers[Self::INSTRUCTION_POINTER] + Instruction::SIZE as Address,
+                );
+                self.set_instruction_pointer(address);
+                return; // to prevent advancing the instruction pointer after the match expression
+            }
+            Return {} => {
+                let return_address = self.stack_pop(memory);
+                self.set_instruction_pointer(return_address);
+                return; // to prevent advancing the instruction pointer after the match expression
             }
         }
         self.advance_instruction_pointer(Direction::Forwards);

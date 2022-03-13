@@ -1158,14 +1158,19 @@ mod tests {
         registers_post = [(Processor::INSTRUCTION_POINTER, address)],
     );
 
-    macro_rules! create_jump_test {
-        ($test_name:ident,
-        $jump_instruction:ident,
-        $lhs:literal,
-        $rhs:literal,
-        $should_jump:literal) => {
+    macro_rules! create_jump_tests {
+        (
+            $address_test_name:ident,
+            $pointer_test_name:ident,
+            $jump_address_instruction:ident,
+            $jump_register_instruction:ident,
+            $lhs:literal,
+            $rhs:literal,
+            $should_jump:literal
+        ) => {
+            // create test for "jump address"
             create_test!(
-                $test_name,
+                $address_test_name,
                 setup = {
                     let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
                     let target_register = 0.into();
@@ -1176,8 +1181,8 @@ mod tests {
                         lhs: 1.into(),
                         rhs: 2.into(),
                     },
-                    Opcode::$jump_instruction {
-                        register: target_register,
+                    Opcode::$jump_address_instruction {
+                        comparison: target_register,
                         address: target_address,
                     },
                 ],
@@ -1186,116 +1191,169 @@ mod tests {
                     Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
                 })],
             );
+
+            // create test for "jump register"
+            create_test!(
+                $pointer_test_name,
+                setup = {
+                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let pointer_register = 0xA.into();
+                    let comparison_register = 0.into();
+                },
+                opcodes = &[
+                    Opcode::CompareTargetLhsRhs {
+                        target: comparison_register,
+                        lhs: 1.into(),
+                        rhs: 2.into(),
+                    },
+                    Opcode::$jump_register_instruction {
+                        pointer: pointer_register,
+                        comparison: comparison_register,
+                    },
+                ],
+                registers_pre = [$lhs => 1, $rhs => 2, target_address => pointer_register],
+                registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
+                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                })],
+            );
         };
     }
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_equal_that_jumps,
+        jump_to_register_if_equal_that_jumps,
         JumpAddressIfEqual,
+        JumpRegisterIfEqual,
         42,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_equal_that_does_not_jump,
+        jump_to_register_if_equal_that_does_not_jump,
         JumpAddressIfEqual,
+        JumpRegisterIfEqual,
         42,
         43,
         false
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_greater_than_that_jumps,
+        jump_to_register_if_greater_than_that_jumps,
         JumpAddressIfGreaterThan,
+        JumpRegisterIfGreaterThan,
         43,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_greater_than_that_does_not_jump_01,
+        jump_to_register_if_greater_than_that_does_not_jump_01,
         JumpAddressIfGreaterThan,
+        JumpRegisterIfGreaterThan,
         42,
         43,
         false
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_greater_than_that_does_not_jump_02,
+        jump_to_register_if_greater_than_that_does_not_jump_02,
         JumpAddressIfGreaterThan,
+        JumpRegisterIfGreaterThan,
         42,
         42,
         false
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_less_than_that_jumps,
+        jump_to_register_if_less_than_that_jumps,
         JumpAddressIfLessThan,
+        JumpRegisterIfLessThan,
         41,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_less_than_that_does_not_jump_01,
+        jump_to_register_if_less_than_that_does_not_jump_01,
         JumpAddressIfLessThan,
+        JumpRegisterIfLessThan,
         43,
         42,
         false
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_less_than_that_does_not_jump_02,
+        jump_to_register_if_less_than_that_does_not_jump_02,
         JumpAddressIfLessThan,
+        JumpRegisterIfLessThan,
         42,
         42,
         false
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_less_than_or_equal_that_jumps_01,
+        jump_to_register_if_less_than_or_equal_that_jumps_01,
         JumpAddressIfLessThanOrEqual,
+        JumpRegisterIfLessThanOrEqual,
         41,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_less_than_or_equal_that_jumps_02,
+        jump_to_register_if_less_than_or_equal_that_jumps_02,
         JumpAddressIfLessThanOrEqual,
+        JumpRegisterIfLessThanOrEqual,
         42,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_less_than_or_equal_that_does_not_jump,
+        jump_to_register_if_less_than_or_equal_that_does_not_jump,
         JumpAddressIfLessThanOrEqual,
+        JumpRegisterIfLessThanOrEqual,
         43,
         42,
         false
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_greater_than_or_equal_that_jumps_01,
+        jump_to_register_if_greater_than_or_equal_that_jumps_01,
         JumpAddressIfGreaterThanOrEqual,
+        JumpRegisterIfGreaterThanOrEqual,
         43,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_greater_than_or_equal_that_jumps_02,
+        jump_to_register_if_greater_than_or_equal_that_jumps_02,
         JumpAddressIfGreaterThanOrEqual,
+        JumpRegisterIfGreaterThanOrEqual,
         42,
         42,
         true
     );
 
-    create_jump_test!(
+    create_jump_tests!(
         jump_to_address_if_greater_than_or_equal_that_does_not_jump,
+        jump_to_register_if_greater_than_or_equal_that_does_not_jump,
         JumpAddressIfGreaterThanOrEqual,
+        JumpRegisterIfGreaterThanOrEqual,
         41,
         42,
         false
@@ -1463,5 +1521,14 @@ mod tests {
         2,
         0,
         false
+    );
+
+    create_test!(
+        no_op_does_advance_the_instruction_pointer,
+        opcodes = &[NoOp {}],
+        registers_post = [(
+            Processor::INSTRUCTION_POINTER,
+            Processor::ENTRY_POINT + Instruction::SIZE as Address
+        )],
     );
 }

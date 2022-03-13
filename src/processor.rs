@@ -323,24 +323,38 @@ impl Processor {
             JumpRegister { register } => {
                 self.set_instruction_pointer(self.registers[register]);
             }
-            JumpAddressIfEqual { register, address } => match self.registers[register] {
+            JumpAddressIfEqual {
+                comparison,
+                address,
+            } => match self.registers[comparison] {
                 0 => self.set_instruction_pointer(address),
                 _ => self.advance_instruction_pointer(Direction::Forwards),
             },
-            JumpAddressIfGreaterThan { register, address } => match self.registers[register] {
+            JumpAddressIfGreaterThan {
+                comparison,
+                address,
+            } => match self.registers[comparison] {
                 1 => self.set_instruction_pointer(address),
                 _ => self.advance_instruction_pointer(Direction::Forwards),
             },
-            JumpAddressIfLessThan { register, address } => match self.registers[register] {
+            JumpAddressIfLessThan {
+                comparison,
+                address,
+            } => match self.registers[comparison] {
                 Word::MAX => self.set_instruction_pointer(address),
                 _ => self.advance_instruction_pointer(Direction::Forwards),
             },
-            JumpAddressIfGreaterThanOrEqual { register, address } => match self.registers[register]
-            {
+            JumpAddressIfGreaterThanOrEqual {
+                comparison,
+                address,
+            } => match self.registers[comparison] {
                 1 | 0 => self.set_instruction_pointer(address),
                 _ => self.advance_instruction_pointer(Direction::Forwards),
             },
-            JumpAddressIfLessThanOrEqual { register, address } => match self.registers[register] {
+            JumpAddressIfLessThanOrEqual {
+                comparison,
+                address,
+            } => match self.registers[comparison] {
                 Word::MAX | 0 => self.set_instruction_pointer(address),
                 _ => self.advance_instruction_pointer(Direction::Forwards),
             },
@@ -368,17 +382,66 @@ impl Processor {
                 false => self.set_instruction_pointer(address),
                 true => self.advance_instruction_pointer(Direction::Forwards),
             },
-            JumpRegisterIfEqual { register, address } => todo!(),
-            JumpRegisterIfGreaterThan { register, address } => todo!(),
-            JumpRegisterIfLessThan { register, address } => todo!(),
-            JumpRegisterIfGreaterThanOrEqual { register, address } => todo!(),
-            JumpRegisterIfLessThanOrEqual { register, address } => todo!(),
-            JumpRegisterIfZero { address } => todo!(),
-            JumpRegisterIfNotZero { address } => todo!(),
-            JumpRegisterIfCarry { address } => todo!(),
-            JumpRegisterIfNotCarry { address } => todo!(),
-            JumpRegisterIfDivideByZero { address } => todo!(),
-            JumpRegisterIfNotDivideByZero { address } => todo!(),
+            JumpRegisterIfEqual {
+                pointer,
+                comparison,
+            } => match self.registers[comparison] {
+                0 => self.set_instruction_pointer(self.registers[pointer]),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfGreaterThan {
+                pointer,
+                comparison,
+            } => match self.registers[comparison] {
+                1 => self.set_instruction_pointer(self.registers[pointer]),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfLessThan {
+                pointer,
+                comparison,
+            } => match self.registers[comparison] {
+                Word::MAX => self.set_instruction_pointer(self.registers[pointer]),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfGreaterThanOrEqual {
+                pointer,
+                comparison,
+            } => match self.registers[comparison] {
+                1 | 0 => self.set_instruction_pointer(self.registers[pointer]),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfLessThanOrEqual {
+                pointer,
+                comparison,
+            } => match self.registers[comparison] {
+                Word::MAX | 0 => self.set_instruction_pointer(self.registers[pointer]),
+                _ => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfZero { pointer } => match self.get_flag(Flag::Zero) {
+                true => self.set_instruction_pointer(self.registers[pointer]),
+                false => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfNotZero { pointer } => match self.get_flag(Flag::Zero) {
+                false => self.set_instruction_pointer(self.registers[pointer]),
+                true => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfCarry { pointer } => match self.get_flag(Flag::Carry) {
+                true => self.set_instruction_pointer(self.registers[pointer]),
+                false => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfNotCarry { pointer } => match self.get_flag(Flag::Carry) {
+                false => self.set_instruction_pointer(self.registers[pointer]),
+                true => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfDivideByZero { pointer } => match self.get_flag(Flag::DivideByZero) {
+                true => self.set_instruction_pointer(self.registers[pointer]),
+                false => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            JumpRegisterIfNotDivideByZero { pointer } => match self.get_flag(Flag::DivideByZero) {
+                false => self.set_instruction_pointer(self.registers[pointer]),
+                true => self.advance_instruction_pointer(Direction::Forwards),
+            },
+            NoOp {} => {}
         }
         if opcode.should_increment_instruction_pointer() {
             self.advance_instruction_pointer(Direction::Forwards);

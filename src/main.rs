@@ -73,17 +73,6 @@ impl Size for Instruction {}
 impl Size for Word {}
 impl Size for HalfWord {}
 
-fn save_instructions(machine: &mut Machine, instructions: &[Instruction]) {
-    let mut address = Processor::ENTRY_POINT;
-    for &instruction in instructions {
-        machine.memory.write_opcode(
-            address,
-            instruction.try_into().expect("Invalid instruction"),
-        );
-        address += Instruction::SIZE as Address;
-    }
-}
-
 fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
     if buffer.len() % Instruction::SIZE != 0 {

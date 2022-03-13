@@ -1,5 +1,4 @@
 use crate::{opcodes::Opcode, Address, Instruction, Size, Word};
-use std::ops::Range;
 
 pub struct Memory {
     data: Vec<Word>,
@@ -50,12 +49,6 @@ impl Memory {
 
     pub fn write_data(&mut self, address: Address, data: Word) {
         self.data[Self::address_to_word_index(address)] = data;
-    }
-
-    pub fn fill(&mut self, range: Range<Address>, value: Word) {
-        for address in range.step_by(Word::SIZE) {
-            self.write_data(address, value);
-        }
     }
 }
 

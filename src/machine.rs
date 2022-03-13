@@ -71,6 +71,7 @@ mod tests {
         ) => {
             #[test]
             fn $test_name() {
+                #![allow(clippy::bool_assert_comparison)]
                 $(
                     $(
                         $setup_tokens
@@ -121,12 +122,6 @@ mod tests {
         };
     }
 
-    fn create_machine_with_data_at(address: Address, data: Word) -> Machine {
-        let mut machine = Machine::new();
-        machine.memory.write_data(address, data);
-        machine
-    }
-
     fn create_machine_with_opcodes(opcodes: &[Opcode]) -> Machine {
         let mut machine = Machine::new();
         for (&opcode, address) in opcodes
@@ -147,10 +142,6 @@ mod tests {
             instruction_pointer + Instruction::SIZE as u32
         );
         machine
-    }
-
-    fn execute_instruction(opcode: Opcode) -> Machine {
-        execute_instruction_with_machine(Machine::new(), opcode)
     }
 
     create_test!(
@@ -453,981 +444,587 @@ mod tests {
         flags_post = [(Zero, true), (Carry, false)],
     );
 
-    #[test]
-    fn subtract_two_values_with_carry_with_both_carry_and_zero_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0;
-        let rhs = Word::MAX;
-        let expected = lhs.wrapping_sub(rhs).wrapping_sub(1);
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            SubtractWithCarryTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
+    create_test!(
+        subtract_two_values_with_carry_with_both_carry_and_zero_flags_set,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_register = 0x0A.into();
+            let lhs: Word = 0;
+            let rhs = Word::MAX;
+            let expected = lhs.wrapping_sub(rhs).wrapping_sub(1);
+        },
+        opcodes = &[SubtractWithCarryTargetLhsRhs {
+            target: target_register,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        flags_pre = [true => Carry],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_register, expected)],
+        flags_post = [(Zero, true), (Carry, true)],
+    );
+
+    create_test!(
+        multiply_two_values_without_any_flags_set,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_high = 0x09.into();
+            let target_low = 0x0A.into();
+            let lhs: Word = 3;
+            let rhs = 4;
+            let expected = lhs * rhs;
+        },
+        opcodes = &[MultiplyHighLowLhsRhs {
+            high: target_high,
+            low: target_low,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_high, 0), (target_low, expected)],
+        flags_post = [(Carry, false), (Zero, false)],
+    );
+
+    create_test!(
+        multiply_two_values_with_zero_flag_set,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_high = 0x09.into();
+            let target_low = 0x0A.into();
+            let lhs: Word = 3;
+            let rhs = 0;
+            let expected = lhs * rhs;
+        },
+        opcodes = &[MultiplyHighLowLhsRhs {
+            high: target_high,
+            low: target_low,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_high, 0), (target_low, expected)],
+        flags_post = [(Carry, false), (Zero, true)],
+    );
+
+    create_test!(
+        multiply_two_values_with_overflow,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_high = 0x09.into();
+            let target_low = 0x0A.into();
+            let lhs: Word = Word::MAX;
+            let rhs = 5;
+            let result = lhs as u64 * rhs as u64;
+            let high_expected = (result >> 32) as u32;
+            let low_expected = result as u32;
+        },
+        opcodes = &[MultiplyHighLowLhsRhs {
+            high: target_high,
+            low: target_low,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_high, high_expected), (target_low, low_expected)],
+        flags_post = [(Carry, true), (Zero, false)],
+    );
+
+    create_test!(
+        multiply_two_values_with_overflow_and_zero_flags_set,
+        setup = {
+            let lhs_register = 0x42.into();
+            let rhs_register = 0x43.into();
+            let target_high = 0x09.into();
+            let target_low = 0x0A.into();
+            let lhs: Word = 1 << (Word::BITS - 1);
+            let rhs = 2;
+            let result = lhs as u64 * rhs as u64;
+            let high_expected = (result >> 32) as u32;
+            let low_expected = result as u32;
+        },
+        opcodes = &[MultiplyHighLowLhsRhs {
+            high: target_high,
+            low: target_low,
+            lhs: lhs_register,
+            rhs: rhs_register,
+        }],
+        registers_pre = [lhs => lhs_register, rhs => rhs_register],
+        registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_high, high_expected), (target_low, low_expected)],
+        flags_post = [(Carry, true), (Zero, true)],
+    );
+
+    macro_rules! create_divmod_test{
+        (
+            $test_name:ident,
+            $lhs:expr,
+            $rhs:expr,
+            $quotient:expr,
+            $remainder:expr,
+            divide_by_zero = $divide_by_zero:literal,
+            zero = $zero:literal
+        ) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let lhs_register = 0x42.into();
+                    let rhs_register = 0x43.into();
+                    let target_quotient = 0x09.into();
+                    let target_remainder = 0x0A.into();
+                    let lhs: Word = $lhs;
+                    let rhs = $rhs;
+                    let expected_quotient = $quotient;
+                    let expected_remainder = $remainder;
+                },
+                opcodes = &[DivmodTargetModLhsRhs {
+                    result: target_quotient,
+                    remainder: target_remainder,
+                    lhs: lhs_register,
+                    rhs: rhs_register,
+                }],
+                registers_pre = [lhs => lhs_register, rhs => rhs_register],
+                registers_post = [
+                    (lhs_register, lhs),
+                    (rhs_register, rhs),
+                    (target_quotient, expected_quotient),
+                    (target_remainder, expected_remainder)],
+                flags_post = [(DivideByZero, $divide_by_zero), (Zero, $zero)],
+            );
+        }
     }
 
-    #[test]
-    fn multiply_two_values_without_any_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_high = 0x09.into();
-        let target_low = 0x0A.into();
-        let lhs: Word = 3;
-        let rhs = 4;
-        let expected = lhs * rhs;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            MultiplyHighLowLhsRhs {
-                high: target_high,
-                low: target_low,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_high], 0);
-        assert_eq!(machine.processor.registers[target_low], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
+    create_divmod_test!(
+        divmod_two_values_with_no_flags_set,
+        15,
+        6,
+        2,
+        3,
+        divide_by_zero = false,
+        zero = false
+    );
+
+    create_divmod_test!(
+        divmod_two_values_with_zero_flag_set,
+        0,
+        6,
+        0,
+        0,
+        divide_by_zero = false,
+        zero = true
+    );
+
+    create_divmod_test!(
+        divmod_two_values_divide_by_zero,
+        15,
+        0,
+        0,
+        15,
+        divide_by_zero = true,
+        zero = true
+    );
+
+    macro_rules! create_bitwise_test{
+        (
+            $test_name:ident,
+            $bitwise_instruction:ident,
+            $lhs:expr,
+            $rhs:expr,
+            $expected:expr,
+            zero = $zero:literal
+        ) => {
+            create_test!(
+                $test_name,
+                setup = {
+                    let lhs_register = 0x42.into();
+                    let rhs_register = 0x43.into();
+                    let target_register = 0x0A.into();
+                    let lhs: Word = $lhs;
+                    let rhs = $rhs;
+                    let expected = $expected;
+                },
+                opcodes = &[$bitwise_instruction {
+                    target: target_register,
+                    lhs: lhs_register,
+                    rhs: rhs_register,
+                }],
+                registers_pre = [lhs => lhs_register, rhs => rhs_register],
+                registers_post = [(lhs_register, lhs), (rhs_register, rhs), (target_register, expected)],
+                flags_post = [(Zero, $zero)],
+            );
+        }
     }
 
-    #[test]
-    fn multiply_two_values_with_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_high = 0x09.into();
-        let target_low = 0x0A.into();
-        let lhs: Word = 3;
-        let rhs = 0;
-        let expected = lhs * rhs;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            MultiplyHighLowLhsRhs {
-                high: target_high,
-                low: target_low,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_high], 0);
-        assert_eq!(machine.processor.registers[target_low], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
+    create_bitwise_test!(
+        bitwise_and_two_values_with_no_flags_set,
+        AndTargetLhsRhs,
+        0b0110_1110_1001_1010_0110_1110_1001_1010,
+        0b1011_1010_0101_1001_1011_1010_0101_1001,
+        0b0010_1010_0001_1000_0010_1010_0001_1000,
+        zero = false
+    );
+
+    create_bitwise_test!(
+        bitwise_and_two_values_with_zero_flag_set,
+        AndTargetLhsRhs,
+        0b0100_0100_1000_0110_0100_0100_1000_0010,
+        0b1011_1010_0101_1001_1011_1010_0101_1001,
+        0,
+        zero = true
+    );
+
+    create_bitwise_test!(
+        bitwise_or_two_values_with_no_flags_set,
+        OrTargetLhsRhs,
+        0b0110_1110_1001_1010_0110_1110_1001_1010,
+        0b1011_1010_0101_1001_1011_1010_0101_1001,
+        0b1111_1110_1101_1011_1111_1110_1101_1011,
+        zero = false
+    );
+
+    create_bitwise_test!(
+        bitwise_or_two_values_with_zero_flag_set,
+        OrTargetLhsRhs,
+        0,
+        0,
+        0,
+        zero = true
+    );
+
+    create_bitwise_test!(
+        bitwise_xor_two_values_with_no_flags_set,
+        XorTargetLhsRhs,
+        0b0110_1110_1001_1010_0110_1110_1001_1010,
+        0b1011_1010_0101_1001_1011_1010_0101_1001,
+        0b1101_0100_1100_0011_1101_0100_1100_0011,
+        zero = false
+    );
+
+    create_bitwise_test!(
+        bitwise_xor_two_values_with_zero_flag_set,
+        XorTargetLhsRhs,
+        0b1011_1010_1001_0010_0100_0100_1001_0010,
+        0b1011_1010_1001_0010_0100_0100_1001_0010,
+        0,
+        zero = true
+    );
+
+    create_test!(
+        bitwise_not_value_with_no_flags_set,
+        setup = {
+            let source = 0x5.into();
+            let target = 0x0A.into();
+            let data = 0b0010_1010_0001_1000_0010_1010_0001_1000;
+            let expected = 0b1101_0101_1110_0111_1101_0101_1110_0111;
+        },
+        opcodes = &[NotTargetSource { target, source }],
+        registers_pre = [data => source],
+        registers_post = [(target, expected)],
+        flags_post = [(Zero, false)],
+    );
+
+    create_test!(
+        bitwise_not_value_with_zero_flag_set,
+        setup = {
+            let source = 0x5.into();
+            let target = 0x0A.into();
+            let data = 0xFFFFFFFF;
+            let expected = 0;
+        },
+        opcodes = &[NotTargetSource { target, source }],
+        registers_pre = [data => source],
+        registers_post = [(target, expected)],
+        flags_post = [(Zero, true)],
+    );
+
+    macro_rules! create_shift_test{
+        (
+            $test_name:ident,
+            $shift_instruction:ident,
+            $lhs:expr,
+            $rhs:expr,
+            $expected:expr,
+            zero = $zero:literal,
+            carry = $carry:literal
+        ) => {
+            create_test!(
+                $test_name,
+                opcodes = &[$shift_instruction {
+                    target: 0x0A.into(),
+                    lhs: 0x5.into(),
+                    rhs: 0x6.into(),
+                }],
+                registers_pre = [$lhs => Register(0x5), $rhs => Register(0x6)],
+                registers_post = [(0x5.into(), $lhs), (0x6.into(), $rhs), (0x0A.into(), $expected)],
+                flags_post = [(Zero, $zero), (Carry, $carry)],
+            );
+        }
     }
 
-    #[test]
-    fn multiply_two_values_with_overflow() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_high = 0x09.into();
-        let target_low = 0x0A.into();
-        let lhs: Word = Word::MAX;
-        let rhs = 5;
-        let result = lhs as u64 * rhs as u64;
-        let high_expected = (result >> 32) as u32;
-        let low_expected = result as u32;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            MultiplyHighLowLhsRhs {
-                high: target_high,
-                low: target_low,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_high], high_expected);
-        assert_eq!(machine.processor.registers[target_low], low_expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
+    create_shift_test!(
+        left_shift_without_any_flags_set,
+        LeftShiftTargetLhsRhs,
+        0b1,
+        2,
+        0b100,
+        zero = false,
+        carry = false
+    );
+
+    create_shift_test!(
+        left_shift_with_carry_flag_set,
+        LeftShiftTargetLhsRhs,
+        0b11 << 30,
+        1,
+        0b1 << 31,
+        zero = false,
+        carry = true
+    );
+
+    create_shift_test!(
+        left_shift_with_carry_and_zero_flags_set,
+        LeftShiftTargetLhsRhs,
+        0b1 << 31,
+        1,
+        0,
+        zero = true,
+        carry = true
+    );
+
+    create_shift_test!(
+        left_shift_way_too_far,
+        LeftShiftTargetLhsRhs,
+        0xFFFF_FFFF,
+        123,
+        0,
+        zero = true,
+        carry = true
+    );
+
+    create_shift_test!(
+        left_shift_zero_way_too_far,
+        LeftShiftTargetLhsRhs,
+        0,
+        123,
+        0,
+        zero = true,
+        carry = false
+    );
+
+    create_shift_test!(
+        right_shift_without_any_flags_set,
+        RightShiftTargetLhsRhs,
+        0b10,
+        1,
+        0b1,
+        zero = false,
+        carry = false
+    );
+
+    create_shift_test!(
+        right_shift_with_carry_flag_set,
+        RightShiftTargetLhsRhs,
+        0b11,
+        1,
+        0b1,
+        zero = false,
+        carry = true
+    );
+
+    create_shift_test!(
+        right_shift_with_zero_flag_set,
+        RightShiftTargetLhsRhs,
+        0b0,
+        1,
+        0,
+        zero = true,
+        carry = false
+    );
+
+    create_shift_test!(
+        right_shift_with_carry_and_zero_flags_set,
+        RightShiftTargetLhsRhs,
+        0b1,
+        1,
+        0,
+        zero = true,
+        carry = true
+    );
+
+    create_shift_test!(
+        right_shift_way_too_far,
+        RightShiftTargetLhsRhs,
+        0xFFFF_FFFF,
+        123,
+        0b0,
+        zero = true,
+        carry = true
+    );
+
+    create_shift_test!(
+        right_shift_zero_way_too_far,
+        RightShiftTargetLhsRhs,
+        0,
+        123,
+        0b0,
+        zero = true,
+        carry = false
+    );
+
+    macro_rules! create_add_immediate_test{
+        (
+            $test_name:ident,
+            $immediate:expr,
+            $source_value:expr,
+            $expected_value:expr,
+            zero = $zero:literal,
+            carry = $carry:literal
+        ) => {
+            create_test!(
+                $test_name,
+                opcodes = &[AddTargetSourceImmediate {
+                    target: Register(0xAB),
+                    source: Register(0x07),
+                    immediate: $immediate,
+                }],
+                registers_pre = [$source_value => Register(0x07)],
+                registers_post = [(Register(0x07), $source_value), (Register(0xAB), $expected_value)],
+                flags_post = [(Zero, $zero), (Carry, $carry)],
+            );
+        }
     }
 
-    #[test]
-    fn multiply_two_values_with_overflow_and_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_high = 0x09.into();
-        let target_low = 0x0A.into();
-        let lhs: Word = 1 << (Word::BITS - 1);
-        let rhs = 2;
-        let result = lhs as u64 * rhs as u64;
-        let high_expected = (result >> 32) as u32;
-        let low_expected = result as u32;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            MultiplyHighLowLhsRhs {
-                high: target_high,
-                low: target_low,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_high], high_expected);
-        assert_eq!(machine.processor.registers[target_low], low_expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
+    create_add_immediate_test!(
+        add_immediate_with_no_flags_set,
+        2,
+        40,
+        42,
+        zero = false,
+        carry = false
+    );
+
+    create_add_immediate_test!(
+        add_immediate_with_zero_flag_set,
+        0,
+        0,
+        0,
+        zero = true,
+        carry = false
+    );
+
+    create_add_immediate_test!(
+        add_immediate_with_carry_flag_set,
+        5,
+        Word::MAX,
+        4,
+        zero = false,
+        carry = true
+    );
+
+    create_add_immediate_test!(
+        add_immediate_with_both_flags_set,
+        1,
+        Word::MAX,
+        0,
+        zero = true,
+        carry = true
+    );
+
+    macro_rules! create_subtract_immediate_test{
+        (
+            $test_name:ident,
+            $immediate:expr,
+            $source_value:expr,
+            $expected_value:expr,
+            zero = $zero:literal,
+            carry = $carry:literal
+        ) => {
+            create_test!(
+                $test_name,
+                opcodes = &[SubtractTargetSourceImmediate {
+                    target: Register(0xAB),
+                    source: Register(0x07),
+                    immediate: $immediate,
+                }],
+                registers_pre = [$source_value => Register(0x07)],
+                registers_post = [(Register(0x07), $source_value), (Register(0xAB), $expected_value)],
+                flags_post = [(Zero, $zero), (Carry, $carry)],
+            );
+        }
     }
 
-    #[test]
-    fn divmod_two_values_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_quotient = 0x09.into();
-        let target_remainder = 0x0A.into();
-        let lhs: Word = 15;
-        let rhs = 6;
-        let expected_quotient = 2;
-        let expected_remainder = 3;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            DivmodTargetModLhsRhs {
-                result: target_quotient,
-                remainder: target_remainder,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(
-            machine.processor.registers[target_quotient],
-            expected_quotient
-        );
-        assert_eq!(
-            machine.processor.registers[target_remainder],
-            expected_remainder
-        );
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::DivideByZero));
+    create_subtract_immediate_test!(
+        subtract_immediate_with_no_flags_set,
+        2,
+        44,
+        42,
+        zero = false,
+        carry = false
+    );
+
+    create_subtract_immediate_test!(
+        subtract_immediate_with_zero_flag_set,
+        42,
+        42,
+        0,
+        zero = true,
+        carry = false
+    );
+
+    create_subtract_immediate_test!(
+        subtract_immediate_with_carry_flag_set,
+        2,
+        1,
+        Word::MAX,
+        zero = false,
+        carry = true
+    );
+
+    macro_rules! create_comparison_test{
+        (
+            $test_name:ident,
+            $lhs:expr,
+            $rhs:expr,
+            $expected:expr,
+            zero = $zero:literal
+        ) => {
+            create_test!(
+                $test_name,
+                opcodes = &[CompareTargetLhsRhs {
+                    target: Register(0x0A),
+                    lhs: Register(0x42),
+                    rhs: Register(0x43),
+                }],
+                registers_pre = [$lhs => Register(0x42), $rhs => Register(0x43)],
+                registers_post = [
+                    (Register(0x42), $lhs),
+                    (Register(0x43), $rhs),
+                    (Register(0x0A), $expected)
+                ],
+                flags_post = [(Zero, $zero)],
+            );
+        }
     }
 
-    #[test]
-    fn divmod_two_values_with_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_quotient = 0x09.into();
-        let target_remainder = 0x0A.into();
-        let lhs: Word = 0;
-        let rhs = 6;
-        let expected_quotient = 0;
-        let expected_remainder = 0;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            DivmodTargetModLhsRhs {
-                result: target_quotient,
-                remainder: target_remainder,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(
-            machine.processor.registers[target_quotient],
-            expected_quotient
-        );
-        assert_eq!(
-            machine.processor.registers[target_remainder],
-            expected_remainder
-        );
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::DivideByZero));
-    }
+    create_comparison_test!(
+        compare_lower_value_against_higher_value,
+        10,
+        12,
+        Word::MAX,
+        zero = false
+    );
 
-    #[test]
-    fn divmod_two_values_divide_by_zero() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_quotient = 0x09.into();
-        let target_remainder = 0x0A.into();
-        let lhs: Word = 15;
-        let rhs = 0;
-        let expected_quotient = 0;
-        let expected_remainder = 15;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            DivmodTargetModLhsRhs {
-                result: target_quotient,
-                remainder: target_remainder,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(
-            machine.processor.registers[target_quotient],
-            expected_quotient
-        );
-        assert_eq!(
-            machine.processor.registers[target_remainder],
-            expected_remainder
-        );
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::DivideByZero));
-    }
+    create_comparison_test!(
+        compare_higher_value_against_lower_value,
+        14,
+        12,
+        1,
+        zero = false
+    );
 
-    #[test]
-    fn bitwise_and_two_values_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0b0110_1110_1001_1010_0110_1110_1001_1010;
-        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
-        let expected = 0b0010_1010_0001_1000_0010_1010_0001_1000;
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            AndTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_and_two_values_with_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0b0100_0100_1000_0110_0100_0100_1000_0010;
-        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
-        let expected = 0;
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            AndTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_or_two_values_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0b0110_1110_1001_1010_0110_1110_1001_1010;
-        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
-        let expected = 0b1111_1110_1101_1011_1111_1110_1101_1011;
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            OrTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_or_two_values_with_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0;
-        let rhs = 0;
-        let expected = 0;
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            OrTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_xor_two_values_with_no_flags_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0b0110_1110_1001_1010_0110_1110_1001_1010;
-        let rhs = 0b1011_1010_0101_1001_1011_1010_0101_1001;
-        let expected = 0b1101_0100_1100_0011_1101_0100_1100_0011;
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            XorTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_xor_two_values_with_zero_flag_set() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs: Word = 0b1011_1010_1001_0010_0100_0100_1001_0010;
-        let rhs = 0b1011_1010_1001_0010_0100_0100_1001_0010;
-        let expected = 0;
-        let mut machine = Machine::new();
-        machine.processor.set_flag(Flag::Carry, true);
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            XorTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_not_value_with_no_flags_set() {
-        let mut machine = Machine::new();
-        let source = 0x5.into();
-        let target = 0x0A.into();
-        let data = 0b0010_1010_0001_1000_0010_1010_0001_1000;
-        let expected = 0b1101_0101_1110_0111_1101_0101_1110_0111;
-        machine.processor.registers[source] = data;
-        let machine = execute_instruction_with_machine(machine, NotTargetSource { target, source });
-        assert_eq!(machine.processor.registers[target], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn bitwise_not_value_with_zero_flag_set() {
-        let mut machine = Machine::new();
-        let source = 0x5.into();
-        let target = 0x0A.into();
-        let data = 0xFFFFFFFF;
-        let expected = 0;
-        machine.processor.registers[source] = data;
-        let machine = execute_instruction_with_machine(machine, NotTargetSource { target, source });
-        assert_eq!(machine.processor.registers[target], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn left_shift_without_any_flags_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b1;
-        let rhs = 2;
-        let expected = 0b100;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            LeftShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn left_shift_with_carry_flag_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b11 << 30;
-        let rhs = 1;
-        let expected = 0b1 << 31;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            LeftShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn left_shift_with_carry_and_zero_flags_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b1 << 31;
-        let rhs = 1;
-        let expected = 0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            LeftShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn left_shift_way_too_far() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0xFFFF_FFFF;
-        let rhs = 123;
-        let expected = 0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            LeftShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn left_shift_zero_way_too_far() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0;
-        let rhs = 123;
-        let expected = 0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            LeftShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn right_shift_without_any_flags_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b10;
-        let rhs = 1;
-        let expected = 0b1;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            RightShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn right_shift_with_carry_flag_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b11;
-        let rhs = 1;
-        let expected = 0b1;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            RightShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn right_shift_with_zero_flag_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b0;
-        let rhs = 1;
-        let expected = 0b0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            RightShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn right_shift_with_carry_and_zero_flags_set() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0b1;
-        let rhs = 1;
-        let expected = 0b0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            RightShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn right_shift_way_too_far() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0xFFFF_FFFF;
-        let rhs = 123;
-        let expected = 0b0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            RightShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn right_shift_zero_way_too_far() {
-        let mut machine = Machine::new();
-        let lhs_register = 0x5.into();
-        let rhs_register = 0x6.into();
-        let target_register = 0x0A.into();
-        let lhs = 0;
-        let rhs = 123;
-        let expected = 0b0;
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let machine = execute_instruction_with_machine(
-            machine,
-            RightShiftTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn add_immediate_with_no_flags_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 2;
-        let source_value = 40;
-        let expected_value = 42;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            AddTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn add_immediate_with_zero_flag_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 0;
-        let source_value = 0;
-        let expected_value = 0;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            AddTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn add_immediate_with_carry_flag_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 5;
-        let source_value = Word::MAX;
-        let expected_value = 4;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            AddTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn add_immediate_with_zero_and_carry_flags_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 1;
-        let source_value = Word::MAX;
-        let expected_value = 0;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            AddTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn subtract_immediate_with_no_flags_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 2;
-        let source_value = 44;
-        let expected_value = 42;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            SubtractTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn subtract_immediate_with_zero_flag_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 42;
-        let source_value = 42;
-        let expected_value = 0;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            SubtractTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(machine.processor.get_flag(Flag::Zero));
-        assert!(!machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn subtract_immediate_with_carry_flag_set() {
-        let mut machine = Machine::new();
-        let target_register = 0xAB.into();
-        let source_register = 0x07.into();
-        let immediate = 2;
-        let source_value = 1;
-        let expected_value = Word::MAX;
-        machine.processor.registers[source_register] = source_value;
-        let machine = execute_instruction_with_machine(
-            machine,
-            SubtractTargetSourceImmediate {
-                target: target_register,
-                source: source_register,
-                immediate,
-            },
-        );
-        assert_eq!(machine.processor.registers[source_register], source_value);
-        assert_eq!(machine.processor.registers[target_register], expected_value);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-        assert!(machine.processor.get_flag(Flag::Carry));
-    }
-
-    #[test]
-    fn compare_lower_value_against_higher_value() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 10;
-        let rhs = 12;
-        let expected = Word::MAX;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            CompareTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn compare_higher_value_against_lower_value() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 14;
-        let rhs = 12;
-        let expected = 1;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            CompareTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(!machine.processor.get_flag(Flag::Zero));
-    }
-
-    #[test]
-    fn compare_equal_values() {
-        let lhs_register = 0x42.into();
-        let rhs_register = 0x43.into();
-        let target_register = 0x0A.into();
-        let lhs = 12;
-        let rhs = 12;
-        let expected = 0;
-        let mut machine = Machine::new();
-        machine.processor.registers[lhs_register] = lhs;
-        machine.processor.registers[rhs_register] = rhs;
-        let mut machine = execute_instruction_with_machine(
-            machine,
-            CompareTargetLhsRhs {
-                target: target_register,
-                lhs: lhs_register,
-                rhs: rhs_register,
-            },
-        );
-        machine.make_tick();
-        assert_eq!(machine.processor.registers[lhs_register], lhs);
-        assert_eq!(machine.processor.registers[rhs_register], rhs);
-        assert_eq!(machine.processor.registers[target_register], expected);
-        assert!(machine.processor.get_flag(Flag::Zero));
-    }
+    create_comparison_test!(compare_equal_values, 12, 12, 0, zero = true);
 
     #[test]
     fn push_and_pop_stack_value() {

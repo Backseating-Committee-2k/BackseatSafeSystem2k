@@ -136,7 +136,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         for _ in 0..num_cycles {
-            execute_next_instruction(&mut is_halted, &mut machine);
+            execute_next_instruction(&mut is_halted, &mut machine, &mut |keycode| {
+                raylib_handle.is_key_down(
+                    raylib::input::key_from_i32(keycode.into()).expect("invalid keycode"),
+                )
+            });
         }
     }
     Ok(())
@@ -172,14 +176,18 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine) {
+fn execute_next_instruction(
+    is_halted: &mut bool,
+    machine: &mut Machine,
+    keystate_callback: &mut impl FnMut(u8) -> bool,
+) {
     match (*is_halted, machine.is_halted()) {
         (false, true) => {
             *is_halted = true;
             println!("HALT AND CATCH FIRE");
         }
         (false, false) => {
-            machine.execute_next_instruction();
+            machine.execute_next_instruction(keystate_callback);
         }
         (_, _) => {}
     }

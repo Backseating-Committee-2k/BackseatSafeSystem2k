@@ -304,4 +304,7 @@ opcodes!(
 
     // no-op
     { NoOp, 0x0031, registers(); cycles = 1, Increment::Yes, "does nothing" },
+
+    // input
+    { GetKeyState, 0x0032, registers(T target, K keycode); cycles = 1, Increment::Yes, "store the keystate (1 = held down, 0 = not held down) of the key specified by register K into register T and set the zero flag appropriately" },
 );

@@ -18,8 +18,9 @@ impl Machine {
         terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
     }
 
-    pub fn execute_next_instruction(&mut self) {
-        self.processor.execute_next_instruction(&mut self.memory);
+    pub fn execute_next_instruction(&mut self, keystate_callback: &mut impl FnMut(u8) -> bool) {
+        self.processor
+            .execute_next_instruction(&mut self.memory, keystate_callback);
     }
 
     #[must_use = "Am I a joke to you?"]
@@ -95,7 +96,7 @@ mod tests {
                 )?
                 $(
                     for _ in 0..$opcodes.len() {
-                        machine.execute_next_instruction();
+                        machine.execute_next_instruction(&mut |_| false);
                     }
                 )?
                 $(
@@ -138,7 +139,7 @@ mod tests {
         machine.memory.write_opcode(instruction_pointer, opcode);
         machine
             .processor
-            .execute_next_instruction(&mut machine.memory);
+            .execute_next_instruction(&mut machine.memory, &mut |_| false);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             instruction_pointer + Instruction::SIZE as u32
@@ -1116,7 +1117,7 @@ mod tests {
             Opcode::Return {},
         );
 
-        machine.execute_next_instruction(); // jump into subroutine
+        machine.execute_next_instruction(&mut |_| false); // jump into subroutine
         assert_eq!(
             machine.memory.read_data(Processor::STACK_START),
             Processor::ENTRY_POINT + Instruction::SIZE as Address
@@ -1126,14 +1127,14 @@ mod tests {
             call_address
         );
 
-        machine.execute_next_instruction(); // write value into register
+        machine.execute_next_instruction(&mut |_| false); // write value into register
         assert_eq!(machine.processor.registers[target_register], value);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             call_address + Instruction::SIZE as Address
         );
 
-        machine.execute_next_instruction(); // jump back from subroutine
+        machine.execute_next_instruction(&mut |_| false); // jump back from subroutine
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             Processor::ENTRY_POINT + Instruction::SIZE as Address
@@ -1533,4 +1534,31 @@ mod tests {
             Processor::ENTRY_POINT + Instruction::SIZE as Address
         )],
     );
+
+    #[test]
+    fn get_keystate() {
+        let keycode_register = 0.into();
+        let target_register = 1.into();
+        let mut machine = create_machine_with_opcodes(&[
+            Opcode::GetKeyState {
+                target: target_register,
+                keycode: keycode_register,
+            },
+            Opcode::GetKeyState {
+                target: target_register,
+                keycode: keycode_register,
+            },
+        ]);
+        let mut keystate_callback = |keycode| keycode == b'A';
+
+        machine.processor.registers[keycode_register] = b'A' as Word;
+        machine.execute_next_instruction(&mut keystate_callback);
+        assert_eq!(machine.processor.registers[target_register], 1);
+        assert!(!machine.processor.get_flag(Flag::Zero));
+
+        machine.processor.registers[keycode_register] = b'B' as Word;
+        machine.execute_next_instruction(&mut keystate_callback);
+        assert_eq!(machine.processor.registers[target_register], 0);
+        assert!(machine.processor.get_flag(Flag::Zero));
+    }
 }

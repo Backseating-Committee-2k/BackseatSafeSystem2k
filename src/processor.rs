@@ -143,7 +143,11 @@ impl Processor {
         self.registers[Self::CYCLE_COUNT_LOW] = new_cycle_count as Word;
     }
 
-    pub fn execute_next_instruction(&mut self, memory: &mut Memory) {
+    pub fn execute_next_instruction(
+        &mut self,
+        memory: &mut Memory,
+        keystate_callback: &mut impl FnMut(u8) -> bool,
+    ) {
         use crate::processor::Opcode::*;
         let opcode = memory.read_opcode(self.get_instruction_pointer());
         if let Err(err) = opcode {
@@ -455,6 +459,10 @@ impl Processor {
                 true => self.advance_instruction_pointer(Direction::Forwards),
             },
             NoOp {} => {}
+            GetKeyState { target, keycode } => {
+                self.registers[target] = keystate_callback(self.registers[keycode] as _).into();
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
+            }
         }
         self.increase_cycle_count(opcode.get_num_cycles().into());
 

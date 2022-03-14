@@ -20,7 +20,7 @@
                 }
             },
             "args": [
-                "./roms/rom.backseat"
+                "./roms/game_of_life.backseat"
             ],
             "cwd": "${workspaceFolder}"
         },
@@ -41,7 +41,7 @@
                 }
             },
             "args": [
-                "./roms/rom.backseat"
+                "./roms/game_of_life.backseat"
             ],
             "cwd": "${workspaceFolder}"
         },

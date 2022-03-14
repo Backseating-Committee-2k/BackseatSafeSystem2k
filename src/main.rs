@@ -8,12 +8,11 @@ use std::{
     env,
     error::Error,
     path::Path,
-    thread::current,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use machine::Machine;
-use num_format::{CustomFormat, Locale, ToFormattedString};
+use num_format::{CustomFormat, ToFormattedString};
 use processor::Processor;
 use raylib::prelude::*;
 
@@ -32,6 +31,8 @@ pub const OPCODE_LENGTH: usize = 16;
 pub const fn static_assert(condition: bool) {
     assert!(condition);
 }
+
+pub const TARGET_FPS: u64 = 60;
 
 pub type Instruction = u64;
 pub type Word = u32;
@@ -80,6 +81,46 @@ impl Size for Instruction {}
 impl Size for Word {}
 impl Size for HalfWord {}
 
+fn main() -> Result<(), Box<dyn Error>> {
+    let rom_filename = env::args()
+        .nth(1)
+        .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
+    let mut machine = Machine::new();
+    load_rom(&mut machine, rom_filename)?;
+    let (mut raylib_handle, thread) = raylib::init()
+        .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
+        .title("Backseater")
+        .build();
+    let font = raylib_handle.load_font(&thread, "./resources/CozetteVector.ttf")?;
+    let mut is_halted = false;
+
+    let mut time_measurements = TimeMeasurements {
+        next_render_time: ms_since_epoch(),
+        last_cycle_count: 0,
+        last_render_time: 0,
+        clock_frequency_accumulator: 0,
+        next_clock_frequency_render: ms_since_epoch() + 1000,
+        num_clock_frequency_accumulations: 0,
+        clock_frequency_average: 0,
+    };
+
+    let custom_number_format = CustomFormat::builder().separator(" ").build()?;
+
+    while !raylib_handle.window_should_close() {
+        render_if_needed(
+            &mut time_measurements,
+            &mut raylib_handle,
+            &thread,
+            &machine,
+            &font,
+            &custom_number_format,
+        );
+
+        make_tick(&mut is_halted, &mut machine);
+    }
+    Ok(())
+}
+
 fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
     if buffer.len() % Instruction::SIZE != 0 {
@@ -110,80 +151,101 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let rom_filename = env::args()
-        .nth(1)
-        .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
-    let mut machine = Machine::new();
-    load_rom(&mut machine, rom_filename)?;
-    let (mut raylib_handle, thread) = raylib::init()
-        .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
-        .title("Backseater")
-        .build();
-    let font = raylib_handle.load_font(&thread, "./resources/CozetteVector.ttf")?;
-    let mut is_halted = false;
-
-    let target_fps = 60;
-    let mut next_render_time = ms_since_epoch();
-    let mut last_cycle_count = 0;
-    let mut last_render_time = 0;
-    let mut clock_frequency_accumulator = 0;
-    let mut next_clock_frequency_render = ms_since_epoch() + 1000;
-    let mut num_clock_frequency_accumulations = 0;
-    let mut clock_frequency_average = 0;
-
-    while !raylib_handle.window_should_close() {
-        let current_time = ms_since_epoch();
-        if current_time >= next_render_time {
-            next_render_time = current_time + current_time - next_render_time + 1000 / target_fps;
-
-            let mut draw_handle = raylib_handle.begin_drawing(&thread);
-            draw_handle.clear_background(Color::BLACK);
-            machine.render(&mut draw_handle, &font);
-            draw_handle.draw_fps(SCREEN_SIZE.width - 150, 10);
-
-            let current_cycle_count = machine.processor.get_cycle_count();
-            if current_time != last_render_time {
-                let time_since_last_render = current_time - last_render_time;
-                let cycles_since_last_render = current_cycle_count - last_cycle_count;
-                let clock_frequency = cycles_since_last_render / time_since_last_render * 1000;
-                clock_frequency_accumulator += clock_frequency;
-                num_clock_frequency_accumulations += 1;
-
-                if current_time >= next_clock_frequency_render {
-                    clock_frequency_average =
-                        clock_frequency_accumulator / num_clock_frequency_accumulations;
-                    next_clock_frequency_render = current_time + 1000;
-                    clock_frequency_accumulator = 0;
-                    num_clock_frequency_accumulations = 0;
-                }
-                let format = CustomFormat::builder().separator(" ").build()?;
-                draw_handle.draw_text_ex(
-                    &font,
-                    &format!(
-                        "{} kHz",
-                        (clock_frequency_average / 1000).to_formatted_string(&format)
-                    ),
-                    Vector2::new(SCREEN_SIZE.width as f32 - 200.0, 100.0),
-                    30.0,
-                    1.0,
-                    Color::WHITE,
-                );
-            }
-            last_render_time = current_time;
-            last_cycle_count = current_cycle_count;
+fn make_tick(is_halted: &mut bool, machine: &mut Machine) {
+    match (*is_halted, machine.is_halted()) {
+        (false, true) => {
+            *is_halted = true;
+            println!("HALT AND CATCH FIRE");
         }
-
-        match (is_halted, machine.is_halted()) {
-            (false, true) => {
-                is_halted = true;
-                println!("HALT AND CATCH FIRE");
-            }
-            (false, false) => {
-                machine.make_tick();
-            }
-            (_, _) => {}
+        (false, false) => {
+            machine.make_tick();
         }
+        (_, _) => {}
     }
-    Ok(())
+}
+
+struct TimeMeasurements {
+    next_render_time: u64,
+    last_cycle_count: u64,
+    last_render_time: u64,
+    clock_frequency_accumulator: u64,
+    next_clock_frequency_render: u64,
+    num_clock_frequency_accumulations: u64,
+    clock_frequency_average: u64,
+}
+
+fn render_if_needed(
+    time_measurements: &mut TimeMeasurements,
+    raylib_handle: &mut RaylibHandle,
+    thread: &RaylibThread,
+    machine: &Machine,
+    font: &Font,
+    custom_number_format: &CustomFormat,
+) {
+    let current_time = ms_since_epoch();
+    if current_time >= time_measurements.next_render_time {
+        time_measurements.next_render_time =
+            current_time + current_time - time_measurements.next_render_time + 1000 / TARGET_FPS;
+
+        let mut draw_handle = raylib_handle.begin_drawing(thread);
+        render(&mut draw_handle, machine, font);
+
+        let current_cycle_count = machine.processor.get_cycle_count();
+        if current_time != time_measurements.last_render_time {
+            calculate_clock_frequency(current_time, time_measurements, current_cycle_count);
+            draw_clock_frequency(
+                time_measurements,
+                custom_number_format,
+                &mut draw_handle,
+                font,
+            );
+        }
+        time_measurements.last_render_time = current_time;
+        time_measurements.last_cycle_count = current_cycle_count;
+    }
+}
+
+fn render(draw_handle: &mut RaylibDrawHandle, machine: &Machine, font: &Font) {
+    draw_handle.clear_background(Color::BLACK);
+    machine.render(draw_handle, font);
+    draw_handle.draw_fps(SCREEN_SIZE.width - 150, 10);
+}
+
+fn calculate_clock_frequency(
+    current_time: u64,
+    time_measurements: &mut TimeMeasurements,
+    current_cycle_count: u64,
+) {
+    let time_since_last_render = current_time - time_measurements.last_render_time;
+    let cycles_since_last_render = current_cycle_count - time_measurements.last_cycle_count;
+    let clock_frequency = cycles_since_last_render / time_since_last_render * 1000;
+    time_measurements.clock_frequency_accumulator += clock_frequency;
+    time_measurements.num_clock_frequency_accumulations += 1;
+    if current_time >= time_measurements.next_clock_frequency_render {
+        time_measurements.clock_frequency_average = time_measurements.clock_frequency_accumulator
+            / time_measurements.num_clock_frequency_accumulations;
+        time_measurements.next_clock_frequency_render = current_time + 1000;
+        time_measurements.clock_frequency_accumulator = 0;
+        time_measurements.num_clock_frequency_accumulations = 0;
+    }
+}
+
+fn draw_clock_frequency(
+    time_measurements: &TimeMeasurements,
+    custom_number_format: &CustomFormat,
+    draw_handle: &mut RaylibDrawHandle,
+    font: &Font,
+) {
+    draw_handle.draw_text_ex(
+        font,
+        &*format!(
+            "{} kHz",
+            (time_measurements.clock_frequency_average / 1000)
+                .to_formatted_string(custom_number_format)
+        ),
+        Vector2::new(SCREEN_SIZE.width as f32 - 200.0, 100.0),
+        30.0,
+        1.0,
+        Color::WHITE,
+    );
 }

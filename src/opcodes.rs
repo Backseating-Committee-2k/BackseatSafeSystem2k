@@ -146,6 +146,7 @@ macro_rules! opcodes {
         $identifier:ident,
         $code:literal,
         registers( $( $register_letter:ident $register_name:ident ),* ) $(, $type:ident )? ;
+        cycles = $num_cycles:literal,
         Increment::$should_increment:ident,
         $comment:literal
     },)+ ) => {
@@ -181,6 +182,14 @@ macro_rules! opcodes {
                 match self {
                     $(
                         Self::$identifier{ .. } => matches!(Increment::$should_increment, Increment::Yes),
+                    )+
+                }
+            }
+
+            pub fn get_num_cycles(self) -> u8 {
+                match self {
+                    $(
+                        Self::$identifier{ .. } => $num_cycles,
                     )+
                 }
             }
@@ -227,72 +236,72 @@ macro_rules! opcodes {
 
 opcodes!(
     // move instructions
-    { MoveRegisterImmediate, 0x0000, registers(R register), immediate; Increment::Yes, "move the value C into register R" },
-    { MoveRegisterAddress, 0x0001, registers(R register), address; Increment::Yes, "move the value at address A into register R" },
-    { MoveTargetSource, 0x0002, registers(T target, S source); Increment::Yes, "move the contents of register S into register T" },
-    { MoveAddressRegister, 0x0003, registers(R register), address; Increment::Yes, "move the contents of register R into memory at address A" },
-    { MoveTargetPointer, 0x0004, registers(T target, P pointer); Increment::Yes, "move the contents addressed by the value of register P into register T" },
-    { MovePointerSource, 0x0005, registers(P pointer, S source); Increment::Yes, "move the contents of register S into memory at address specified by register P" },
+    { MoveRegisterImmediate, 0x0000, registers(R register), immediate; cycles = 1, Increment::Yes, "move the value C into register R" },
+    { MoveRegisterAddress, 0x0001, registers(R register), address; cycles = 1, Increment::Yes, "move the value at address A into register R" },
+    { MoveTargetSource, 0x0002, registers(T target, S source); cycles = 1, Increment::Yes, "move the contents of register S into register T" },
+    { MoveAddressRegister, 0x0003, registers(R register), address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A" },
+    { MoveTargetPointer, 0x0004, registers(T target, P pointer); cycles = 1, Increment::Yes, "move the contents addressed by the value of register P into register T" },
+    { MovePointerSource, 0x0005, registers(P pointer, S source); cycles = 1, Increment::Yes, "move the contents of register S into memory at address specified by register P" },
 
     // halt and catch fire
-    { HaltAndCatchFire, 0x0006, registers(); Increment::No, "halt and catch fire" },
+    { HaltAndCatchFire, 0x0006, registers(); cycles = 1, Increment::No, "halt and catch fire" },
 
     // arithmetic instructions
-    { AddTargetLhsRhs, 0x0007, registers(T target, L lhs, R rhs); Increment::Yes, "add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
-    { SubtractTargetLhsRhs, 0x0008, registers(T target, L lhs, R rhs); Increment::Yes, "subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
-    { SubtractWithCarryTargetLhsRhs, 0x0009, registers(T target, L lhs, R rhs); Increment::Yes, "subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
-    { MultiplyHighLowLhsRhs, 0x000A, registers(H high, T low, L lhs, R rhs); Increment::Yes, "multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately" },
-    { DivmodTargetModLhsRhs, 0x000B, registers(D result, M remainder, L lhs, R rhs); Increment::Yes, "divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately" },
+    { AddTargetLhsRhs, 0x0007, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
+    { SubtractTargetLhsRhs, 0x0008, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
+    { SubtractWithCarryTargetLhsRhs, 0x0009, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
+    { MultiplyHighLowLhsRhs, 0x000A, registers(H high, T low, L lhs, R rhs); cycles = 1, Increment::Yes, "multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately" },
+    { DivmodTargetModLhsRhs, 0x000B, registers(D result, M remainder, L lhs, R rhs); cycles = 1, Increment::Yes, "divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately" },
 
     // bitwise instructions
-    { AndTargetLhsRhs, 0x000C, registers(T target, L lhs, R rhs); Increment::Yes, "and the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
-    { OrTargetLhsRhs, 0x000D, registers(T target, L lhs, R rhs); Increment::Yes, "or the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
-    { XorTargetLhsRhs, 0x000E, registers(T target, L lhs, R rhs); Increment::Yes, "xor the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
-    { NotTargetSource, 0x000F, registers(T target, S source); Increment::Yes, "not the value in register SS, store the result in TT, set zero flag appropriately" },
-    { LeftShiftTargetLhsRhs, 0x0010, registers(T target, L lhs, R rhs); Increment::Yes, "left shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately" },
-    { RightShiftTargetLhsRhs, 0x0011, registers(T target, L lhs, R rhs); Increment::Yes, "right shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately" },
-    { AddTargetSourceImmediate, 0x0012, registers(T target, S source), immediate; Increment::Yes, "add the constant CC to the value in register SS and store the result in TT, set zero and carry flags appropriately" },
-    { SubtractTargetSourceImmediate, 0x0013, registers(T target, S source), immediate; Increment::Yes, "subtract the constant CC from the value in register SS and store the result in TT, set zero and carry flags appropriately" },
+    { AndTargetLhsRhs, 0x000C, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "and the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
+    { OrTargetLhsRhs, 0x000D, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "or the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
+    { XorTargetLhsRhs, 0x000E, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "xor the values in registers LL and RR, store the result in TT, set zero flag appropriately" },
+    { NotTargetSource, 0x000F, registers(T target, S source); cycles = 1, Increment::Yes, "not the value in register SS, store the result in TT, set zero flag appropriately" },
+    { LeftShiftTargetLhsRhs, 0x0010, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "left shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately" },
+    { RightShiftTargetLhsRhs, 0x0011, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "right shift the value in register LL by RR bits, store the result in TT, set zero and carry flags appropriately" },
+    { AddTargetSourceImmediate, 0x0012, registers(T target, S source), immediate; cycles = 1, Increment::Yes, "add the constant CC to the value in register SS and store the result in TT, set zero and carry flags appropriately" },
+    { SubtractTargetSourceImmediate, 0x0013, registers(T target, S source), immediate; cycles = 1, Increment::Yes, "subtract the constant CC from the value in register SS and store the result in TT, set zero and carry flags appropriately" },
 
     // comparison
-    { CompareTargetLhsRhs, 0x0014, registers(T target, L lhs, R rhs); Increment::Yes, "compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately" },
+    { CompareTargetLhsRhs, 0x0014, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately" },
 
     // stack instructions
-    { PushRegister, 0x0015, registers(R register); Increment::Yes, "push the value of register RR onto the stack" },
-    { PopRegister, 0x0016, registers(R register); Increment::Yes, "pop from the stack and store the value in register RR" },
-    { CallAddress, 0x0017, registers(), address; Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
-    { Return, 0x0018, registers(); Increment::No, "pop the return address from the stack and jump to it" },
+    { PushRegister, 0x0015, registers(R register); cycles = 1, Increment::Yes, "push the value of register RR onto the stack" },
+    { PopRegister, 0x0016, registers(R register); cycles = 1, Increment::Yes, "pop from the stack and store the value in register RR" },
+    { CallAddress, 0x0017, registers(), address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
+    { Return, 0x0018, registers(); cycles = 1, Increment::No, "pop the return address from the stack and jump to it" },
 
     // unconditional jumps
-    { JumpAddress, 0x0019, registers(), address; Increment::No, "jump to the given address" },
-    { JumpRegister, 0x001A, registers(R register); Increment::No, "jump to the address stored in register R" },
+    { JumpAddress, 0x0019, registers(), address; cycles = 1, Increment::No, "jump to the given address" },
+    { JumpRegister, 0x001A, registers(R register); cycles = 1, Increment::No, "jump to the address stored in register R" },
 
     // conditional jumps, address given as immediate
-    { JumpAddressIfEqual, 0x001B, registers(C comparison), address; Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"equality\"" },
-    { JumpAddressIfGreaterThan, 0x001C, registers(C comparison), address; Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\"" },
-    { JumpAddressIfLessThan, 0x001D, registers(C comparison), address; Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\"" },
-    { JumpAddressIfGreaterThanOrEqual, 0x001E, registers(C comparison), address; Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
-    { JumpAddressIfLessThanOrEqual, 0x001F, registers(C comparison), address; Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
-    { JumpAddressIfZero, 0x0020, registers(), address; Increment::No, "jump to the specified address if the zero flag is set" },
-    { JumpAddressIfNotZero, 0x0021, registers(), address; Increment::No, "jump to the specified address if the zero flag is not set" },
-    { JumpAddressIfCarry, 0x0022, registers(), address; Increment::No, "jump to the specified address if the carry flag is set" },
-    { JumpAddressIfNotCarry, 0x0023, registers(), address; Increment::No, "jump to the specified address if the carry flag is not set" },
-    { JumpAddressIfDivideByZero, 0x0024, registers(), address; Increment::No, "jump to the specified address if the divide by zero flag is set" },
-    { JumpAddressIfNotDivideByZero, 0x0025, registers(), address; Increment::No, "jump to the specified address if the divide by zero flag is not set" },
+    { JumpAddressIfEqual, 0x001B, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"equality\"" },
+    { JumpAddressIfGreaterThan, 0x001C, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\"" },
+    { JumpAddressIfLessThan, 0x001D, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\"" },
+    { JumpAddressIfGreaterThanOrEqual, 0x001E, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
+    { JumpAddressIfLessThanOrEqual, 0x001F, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
+    { JumpAddressIfZero, 0x0020, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is set" },
+    { JumpAddressIfNotZero, 0x0021, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is not set" },
+    { JumpAddressIfCarry, 0x0022, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is set" },
+    { JumpAddressIfNotCarry, 0x0023, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is not set" },
+    { JumpAddressIfDivideByZero, 0x0024, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is set" },
+    { JumpAddressIfNotDivideByZero, 0x0025, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is not set" },
 
     // conditional jumps, address given as register
-    { JumpRegisterIfEqual, 0x0026, registers(P pointer, C comparison); Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"equality\"" },
-    { JumpRegisterIfGreaterThan, 0x0027, registers(P pointer, C comparison); Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"greater than\"" },
-    { JumpRegisterIfLessThan, 0x0028, registers(P pointer, C comparison); Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"less than\"" },
-    { JumpRegisterIfGreaterThanOrEqual, 0x0029, registers(P pointer, C comparison); Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
-    { JumpRegisterIfLessThanOrEqual, 0x002A, registers(P pointer, C comparison); Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
-    { JumpRegisterIfZero, 0x002B, registers(P pointer); Increment::No, "jump to the address specified in register P if the zero flag is set" },
-    { JumpRegisterIfNotZero, 0x002C, registers(P pointer); Increment::No, "jump to the address specified in register P if the zero flag is not set" },
-    { JumpRegisterIfCarry, 0x002D, registers(P pointer); Increment::No, "jump to the address specified in register P if the carry flag is set" },
-    { JumpRegisterIfNotCarry, 0x002E, registers(P pointer); Increment::No, "jump to the address specified in register P if the carry flag is not set" },
-    { JumpRegisterIfDivideByZero, 0x002F, registers(P pointer); Increment::No, "jump to the address specified in register P if the divide by zero flag is set" },
-    { JumpRegisterIfNotDivideByZero, 0x0030, registers(P pointer); Increment::No, "jump to the address specified in register P if the divide by zero flag is not set" },
+    { JumpRegisterIfEqual, 0x0026, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"equality\"" },
+    { JumpRegisterIfGreaterThan, 0x0027, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"greater than\"" },
+    { JumpRegisterIfLessThan, 0x0028, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"less than\"" },
+    { JumpRegisterIfGreaterThanOrEqual, 0x0029, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
+    { JumpRegisterIfLessThanOrEqual, 0x002A, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
+    { JumpRegisterIfZero, 0x002B, registers(P pointer); cycles = 1, Increment::No, "jump to the address specified in register P if the zero flag is set" },
+    { JumpRegisterIfNotZero, 0x002C, registers(P pointer); cycles = 1, Increment::No, "jump to the address specified in register P if the zero flag is not set" },
+    { JumpRegisterIfCarry, 0x002D, registers(P pointer); cycles = 1, Increment::No, "jump to the address specified in register P if the carry flag is set" },
+    { JumpRegisterIfNotCarry, 0x002E, registers(P pointer); cycles = 1, Increment::No, "jump to the address specified in register P if the carry flag is not set" },
+    { JumpRegisterIfDivideByZero, 0x002F, registers(P pointer); cycles = 1, Increment::No, "jump to the address specified in register P if the divide by zero flag is set" },
+    { JumpRegisterIfNotDivideByZero, 0x0030, registers(P pointer); cycles = 1, Increment::No, "jump to the address specified in register P if the divide by zero flag is not set" },
 
     // no-op
-    { NoOp, 0x0031, registers(); Increment::Yes, "does nothing" },
+    { NoOp, 0x0031, registers(); cycles = 1, Increment::Yes, "does nothing" },
 );

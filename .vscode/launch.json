@@ -33,7 +33,7 @@
                     "build",
                     "--bin=backseat_safe_system_2k",
                     "--package=backseat_safe_system_2k",
-                    "release"
+                    "--release"
                 ],
                 "filter": {
                     "name": "backseat_safe_system_2k",

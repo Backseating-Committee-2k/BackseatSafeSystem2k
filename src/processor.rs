@@ -50,6 +50,8 @@ pub struct Processor {
 
 impl Processor {
     pub const NUM_REGISTERS: usize = 256;
+    pub const CYCLE_COUNT_HIGH: Register = Register((Self::NUM_REGISTERS - 5) as _);
+    pub const CYCLE_COUNT_LOW: Register = Register((Self::NUM_REGISTERS - 4) as _);
     pub const FLAGS: Register = Register((Self::NUM_REGISTERS - 3) as _);
     pub const INSTRUCTION_POINTER: Register = Register((Self::NUM_REGISTERS - 2) as _);
     pub const STACK_POINTER: Register = Register((Self::NUM_REGISTERS - 1) as _);
@@ -128,6 +130,17 @@ impl Processor {
                     .saturating_sub(Instruction::SIZE as Address),
             ),
         }
+    }
+
+    pub fn get_cycle_count(&self) -> u64 {
+        ((self.registers[Self::CYCLE_COUNT_HIGH] as u64) << Word::BITS)
+            | self.registers[Self::CYCLE_COUNT_LOW] as u64
+    }
+
+    pub fn increase_cycle_count(&mut self, amount: u64) {
+        let new_cycle_count = self.get_cycle_count() + amount;
+        self.registers[Self::CYCLE_COUNT_HIGH] = (new_cycle_count >> Word::BITS) as Word;
+        self.registers[Self::CYCLE_COUNT_LOW] = new_cycle_count as Word;
     }
 
     pub fn make_tick(&mut self, memory: &mut Memory) {
@@ -443,6 +456,8 @@ impl Processor {
             },
             NoOp {} => {}
         }
+        self.increase_cycle_count(opcode.get_num_cycles().into());
+
         if opcode.should_increment_instruction_pointer() {
             self.advance_instruction_pointer(Direction::Forwards);
         }

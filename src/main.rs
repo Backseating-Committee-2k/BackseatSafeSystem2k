@@ -107,7 +107,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let custom_number_format = CustomFormat::builder().separator(" ").build()?;
 
     while !raylib_handle.window_should_close() {
+        let current_time = ms_since_epoch();
         render_if_needed(
+            current_time,
             &mut time_measurements,
             &mut raylib_handle,
             &thread,
@@ -116,7 +118,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             &custom_number_format,
         );
 
-        for _ in 0..10000 {
+        let num_cycles = match (
+            time_measurements.clock_frequency_average,
+            current_time > time_measurements.next_render_time,
+        ) {
+            (_, true) => {
+                time_measurements.next_render_time = current_time;
+                0
+            }
+            (0, false) => 10_000,
+            (_, false) => {
+                let remaining_ms_until_next_render =
+                    time_measurements.next_render_time - current_time;
+                let cycle_duration = 1000.0 / time_measurements.clock_frequency_average as f64;
+                (remaining_ms_until_next_render as f64 / cycle_duration - 10.0) as u64
+            }
+        };
+
+        for _ in 0..num_cycles {
             execute_next_instruction(&mut is_halted, &mut machine);
         }
     }
@@ -177,6 +196,7 @@ struct TimeMeasurements {
 }
 
 fn render_if_needed(
+    current_time: u64,
     time_measurements: &mut TimeMeasurements,
     raylib_handle: &mut RaylibHandle,
     thread: &RaylibThread,
@@ -184,7 +204,6 @@ fn render_if_needed(
     font: &Font,
     custom_number_format: &CustomFormat,
 ) {
-    let current_time = ms_since_epoch();
     if current_time >= time_measurements.next_render_time {
         time_measurements.next_render_time += 1000 / TARGET_FPS;
 
@@ -219,7 +238,7 @@ fn calculate_clock_frequency(
 ) {
     let time_since_last_render = current_time - time_measurements.last_render_time;
     let cycles_since_last_render = current_cycle_count - time_measurements.last_cycle_count;
-    let clock_frequency = cycles_since_last_render / time_since_last_render * 1000;
+    let clock_frequency = 1000 * cycles_since_last_render / time_since_last_render;
     time_measurements.clock_frequency_accumulator += clock_frequency;
     time_measurements.num_clock_frequency_accumulations += 1;
     if current_time >= time_measurements.next_clock_frequency_render {

@@ -143,7 +143,7 @@ impl Processor {
         self.registers[Self::CYCLE_COUNT_LOW] = new_cycle_count as Word;
     }
 
-    pub fn make_tick(&mut self, memory: &mut Memory) {
+    pub fn execute_next_instruction(&mut self, memory: &mut Memory) {
         use crate::processor::Opcode::*;
         let opcode = memory.read_opcode(self.get_instruction_pointer());
         if let Err(err) = opcode {

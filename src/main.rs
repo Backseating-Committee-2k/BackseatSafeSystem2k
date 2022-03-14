@@ -116,7 +116,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             &custom_number_format,
         );
 
-        make_tick(&mut is_halted, &mut machine);
+        for _ in 0..10000 {
+            execute_next_instruction(&mut is_halted, &mut machine);
+        }
     }
     Ok(())
 }
@@ -151,14 +153,14 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn make_tick(is_halted: &mut bool, machine: &mut Machine) {
+fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine) {
     match (*is_halted, machine.is_halted()) {
         (false, true) => {
             *is_halted = true;
             println!("HALT AND CATCH FIRE");
         }
         (false, false) => {
-            machine.make_tick();
+            machine.execute_next_instruction();
         }
         (_, _) => {}
     }
@@ -184,8 +186,7 @@ fn render_if_needed(
 ) {
     let current_time = ms_since_epoch();
     if current_time >= time_measurements.next_render_time {
-        time_measurements.next_render_time =
-            current_time + current_time - time_measurements.next_render_time + 1000 / TARGET_FPS;
+        time_measurements.next_render_time += 1000 / TARGET_FPS;
 
         let mut draw_handle = raylib_handle.begin_drawing(thread);
         render(&mut draw_handle, machine, font);

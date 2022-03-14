@@ -18,8 +18,8 @@ impl Machine {
         terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
     }
 
-    pub fn make_tick(&mut self) {
-        self.processor.make_tick(&mut self.memory);
+    pub fn execute_next_instruction(&mut self) {
+        self.processor.execute_next_instruction(&mut self.memory);
     }
 
     #[must_use = "Am I a joke to you?"]
@@ -95,7 +95,7 @@ mod tests {
                 )?
                 $(
                     for _ in 0..$opcodes.len() {
-                        machine.make_tick();
+                        machine.execute_next_instruction();
                     }
                 )?
                 $(
@@ -136,7 +136,9 @@ mod tests {
     fn execute_instruction_with_machine(mut machine: Machine, opcode: Opcode) -> Machine {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
-        machine.processor.make_tick(&mut machine.memory);
+        machine
+            .processor
+            .execute_next_instruction(&mut machine.memory);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             instruction_pointer + Instruction::SIZE as u32
@@ -1114,7 +1116,7 @@ mod tests {
             Opcode::Return {},
         );
 
-        machine.make_tick(); // jump into subroutine
+        machine.execute_next_instruction(); // jump into subroutine
         assert_eq!(
             machine.memory.read_data(Processor::STACK_START),
             Processor::ENTRY_POINT + Instruction::SIZE as Address
@@ -1124,14 +1126,14 @@ mod tests {
             call_address
         );
 
-        machine.make_tick(); // write value into register
+        machine.execute_next_instruction(); // write value into register
         assert_eq!(machine.processor.registers[target_register], value);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             call_address + Instruction::SIZE as Address
         );
 
-        machine.make_tick(); // jump back from subroutine
+        machine.execute_next_instruction(); // jump back from subroutine
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             Processor::ENTRY_POINT + Instruction::SIZE as Address

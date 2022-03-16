@@ -307,4 +307,7 @@ opcodes!(
 
     // input
     { GetKeyState, 0x0032, registers(T target, K keycode); cycles = 1, Increment::Yes, "store the keystate (1 = held down, 0 = not held down) of the key specified by register K into register T and set the zero flag appropriately" },
+
+    // Timing
+    { PollTime, 0x0033, registers(H high, L low); cycles = 1, Increment::Yes, "store the number of milliseconds since the UNIX epoch into registers high and low" },
 );

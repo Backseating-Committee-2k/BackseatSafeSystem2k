@@ -3,6 +3,7 @@
 use std::ops::{Index, IndexMut};
 
 use crate::opcodes::Opcode;
+use crate::periphery::Periphery;
 use crate::static_assert;
 use crate::terminal;
 use crate::{memory::Memory, Address, Instruction, Word};
@@ -147,6 +148,7 @@ impl Processor {
         &mut self,
         memory: &mut Memory,
         keystate_callback: &mut impl FnMut(u8) -> bool,
+        periphery: &mut Periphery,
     ) {
         use crate::processor::Opcode::*;
         let opcode = memory.read_opcode(self.get_instruction_pointer());
@@ -462,6 +464,11 @@ impl Processor {
             GetKeyState { target, keycode } => {
                 self.registers[target] = keystate_callback(self.registers[keycode] as _).into();
                 self.set_flag(Flag::Zero, self.registers[target] == 0);
+            }
+            PollTime { high, low } => {
+                let time = periphery.timer.get_ms_since_epoch();
+                self.registers[low] = time as Word;
+                self.registers[high] = (time >> Word::BITS) as Word;
             }
         }
         self.increase_cycle_count(opcode.get_num_cycles().into());

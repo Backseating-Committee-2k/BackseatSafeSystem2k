@@ -1,16 +1,21 @@
-use crate::{memory::Memory, opcodes::Opcode, processor::Processor, terminal, Instruction};
+use crate::{
+    memory::Memory, opcodes::Opcode, periphery::Periphery, processor::Processor, terminal,
+    Instruction,
+};
 use raylib::prelude::*;
 
 pub struct Machine {
     pub memory: Memory,
     pub processor: Processor,
+    pub periphery: Periphery,
 }
 
 impl Machine {
-    pub fn new() -> Self {
+    pub fn new(periphery: Periphery) -> Self {
         Self {
             memory: Memory::new(),
             processor: Processor::new(),
+            periphery,
         }
     }
 
@@ -19,8 +24,11 @@ impl Machine {
     }
 
     pub fn execute_next_instruction(&mut self, keystate_callback: &mut impl FnMut(u8) -> bool) {
-        self.processor
-            .execute_next_instruction(&mut self.memory, keystate_callback);
+        self.processor.execute_next_instruction(
+            &mut self.memory,
+            keystate_callback,
+            &mut self.periphery,
+        );
     }
 
     #[must_use = "Am I a joke to you?"]
@@ -40,6 +48,7 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use crate::processor::Flag;
+    use crate::timer::Timer;
     use crate::{
         opcodes::Opcode::{self, *},
         Register,
@@ -124,7 +133,7 @@ mod tests {
     }
 
     fn create_machine_with_opcodes(opcodes: &[Opcode]) -> Machine {
-        let mut machine = Machine::new();
+        let mut machine = Machine::new(create_mock_periphery());
         for (&opcode, address) in opcodes
             .iter()
             .zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
@@ -137,14 +146,27 @@ mod tests {
     fn execute_instruction_with_machine(mut machine: Machine, opcode: Opcode) -> Machine {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
-        machine
-            .processor
-            .execute_next_instruction(&mut machine.memory, &mut |_| false);
+        machine.processor.execute_next_instruction(
+            &mut machine.memory,
+            &mut |_| false,
+            &mut machine.periphery,
+        );
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             instruction_pointer + Instruction::SIZE as u32
         );
         machine
+    }
+
+    fn create_mock_periphery() -> Periphery {
+        let mut time = 0;
+        Periphery {
+            timer: Timer::new(move || {
+                let old_value = time;
+                time += 1;
+                old_value
+            }),
+        }
     }
 
     create_test!(
@@ -186,7 +208,7 @@ mod tests {
 
     #[test]
     fn move_from_one_register_to_another() {
-        let mut machine = Machine::new();
+        let mut machine = Machine::new(create_mock_periphery());
         let source = 0x5.into();
         let target = 0x0A.into();
         let data = 0xCAFE;
@@ -1031,7 +1053,7 @@ mod tests {
 
     #[test]
     fn push_and_pop_stack_value() {
-        let mut machine = Machine::new();
+        let mut machine = Machine::new(create_mock_periphery());
         let source_register = 0xAB.into();
         let target_register = 0x06.into();
         let data = 42;
@@ -1067,7 +1089,7 @@ mod tests {
     #[test]
     fn push_and_pop_multiple_stack_values() {
         let values = [1, 4, 5, 42, 2, 3];
-        let mut machine = Machine::new();
+        let mut machine = Machine::new(create_mock_periphery());
         for (register, value) in (0..).map(Register).zip(values) {
             machine.processor.registers[register] = value;
             machine = execute_instruction_with_machine(machine, PushRegister { register });
@@ -1095,7 +1117,7 @@ mod tests {
 
     #[test]
     fn call_and_return() {
-        let mut machine = Machine::new();
+        let mut machine = Machine::new(create_mock_periphery());
         let call_address = Processor::ENTRY_POINT + 200 * Instruction::SIZE as Address;
         machine.memory.write_opcode(
             Processor::ENTRY_POINT,
@@ -1561,4 +1583,19 @@ mod tests {
         assert_eq!(machine.processor.registers[target_register], 0);
         assert!(machine.processor.get_flag(Flag::Zero));
     }
+
+    create_test!(
+        poll_time_twice,
+        opcodes = &[
+            Opcode::PollTime {
+                high: 0.into(),
+                low: 1.into()
+            },
+            Opcode::PollTime {
+                high: 0.into(),
+                low: 1.into()
+            },
+        ],
+        registers_post = [(0.into(), 0), (1.into(), 1)],
+    );
 }

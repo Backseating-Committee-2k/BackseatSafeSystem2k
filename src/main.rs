@@ -1,8 +1,10 @@
 mod machine;
 mod memory;
 mod opcodes;
+mod periphery;
 mod processor;
 mod terminal;
+mod timer;
 
 use std::{
     env,
@@ -13,8 +15,10 @@ use std::{
 
 use machine::Machine;
 use num_format::{CustomFormat, ToFormattedString};
+use periphery::Periphery;
 use processor::Processor;
 use raylib::prelude::*;
+use timer::Timer;
 
 pub struct Size2D {
     width: i32,
@@ -85,12 +89,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rom_filename = env::args()
         .nth(1)
         .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
-    let mut machine = Machine::new();
-    load_rom(&mut machine, rom_filename)?;
+
     let (mut raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
         .build();
+    let periphery = Periphery {
+        timer: Timer::new(ms_since_epoch),
+    };
+    let mut machine = Machine::new(periphery);
+    load_rom(&mut machine, rom_filename)?;
+
     let font = raylib_handle.load_font(&thread, "./resources/CozetteVector.ttf")?;
     let mut is_halted = false;
 

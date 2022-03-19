@@ -23,12 +23,9 @@ impl Machine {
         terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
     }
 
-    pub fn execute_next_instruction(&mut self, keystate_callback: &mut impl FnMut(u8) -> bool) {
-        self.processor.execute_next_instruction(
-            &mut self.memory,
-            keystate_callback,
-            &mut self.periphery,
-        );
+    pub fn execute_next_instruction(&mut self) {
+        self.processor
+            .execute_next_instruction(&mut self.memory, &mut self.periphery);
     }
 
     #[must_use = "Am I a joke to you?"]
@@ -47,6 +44,7 @@ impl Machine {
 
 #[cfg(test)]
 mod tests {
+    use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
     use crate::timer::Timer;
     use crate::{
@@ -105,7 +103,7 @@ mod tests {
                 )?
                 $(
                     for _ in 0..$opcodes.len() {
-                        machine.execute_next_instruction(&mut |_| false);
+                        machine.execute_next_instruction();
                     }
                 )?
                 $(
@@ -146,11 +144,9 @@ mod tests {
     fn execute_instruction_with_machine(mut machine: Machine, opcode: Opcode) -> Machine {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
-        machine.processor.execute_next_instruction(
-            &mut machine.memory,
-            &mut |_| false,
-            &mut machine.periphery,
-        );
+        machine
+            .processor
+            .execute_next_instruction(&mut machine.memory, &mut machine.periphery);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             instruction_pointer + Instruction::SIZE as u32
@@ -166,6 +162,7 @@ mod tests {
                 time += 1;
                 old_value
             }),
+            keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
         }
     }
 
@@ -1139,7 +1136,7 @@ mod tests {
             Opcode::Return {},
         );
 
-        machine.execute_next_instruction(&mut |_| false); // jump into subroutine
+        machine.execute_next_instruction(); // jump into subroutine
         assert_eq!(
             machine.memory.read_data(Processor::STACK_START),
             Processor::ENTRY_POINT + Instruction::SIZE as Address
@@ -1149,14 +1146,14 @@ mod tests {
             call_address
         );
 
-        machine.execute_next_instruction(&mut |_| false); // write value into register
+        machine.execute_next_instruction(); // write value into register
         assert_eq!(machine.processor.registers[target_register], value);
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             call_address + Instruction::SIZE as Address
         );
 
-        machine.execute_next_instruction(&mut |_| false); // jump back from subroutine
+        machine.execute_next_instruction(); // jump back from subroutine
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             Processor::ENTRY_POINT + Instruction::SIZE as Address
@@ -1571,15 +1568,23 @@ mod tests {
                 keycode: keycode_register,
             },
         ]);
-        let mut keystate_callback = |keycode| keycode == b'A';
-
-        machine.processor.registers[keycode_register] = b'A' as Word;
-        machine.execute_next_instruction(&mut keystate_callback);
+        machine.periphery.keyboard = Keyboard::new(Box::new(|keycode| {
+            if raylib::input::key_from_i32(keycode.try_into().expect("keycode out of range"))
+                .expect("invalid keycode")
+                == raylib::consts::KeyboardKey::KEY_A
+            {
+                KeyState::Down
+            } else {
+                KeyState::Up
+            }
+        }));
+        machine.processor.registers[keycode_register] = raylib::consts::KeyboardKey::KEY_A as Word;
+        machine.execute_next_instruction();
         assert_eq!(machine.processor.registers[target_register], 1);
         assert!(!machine.processor.get_flag(Flag::Zero));
 
-        machine.processor.registers[keycode_register] = b'B' as Word;
-        machine.execute_next_instruction(&mut keystate_callback);
+        machine.processor.registers[keycode_register] = raylib::consts::KeyboardKey::KEY_B as Word;
+        machine.execute_next_instruction();
         assert_eq!(machine.processor.registers[target_register], 0);
         assert!(machine.processor.get_flag(Flag::Zero));
     }

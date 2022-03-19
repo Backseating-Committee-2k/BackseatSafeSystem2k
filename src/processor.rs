@@ -2,6 +2,7 @@
 
 use std::ops::{Index, IndexMut};
 
+use crate::keyboard::KeyState;
 use crate::opcodes::Opcode;
 use crate::periphery::Periphery;
 use crate::static_assert;
@@ -144,12 +145,7 @@ impl Processor {
         self.registers[Self::CYCLE_COUNT_LOW] = new_cycle_count as Word;
     }
 
-    pub fn execute_next_instruction(
-        &mut self,
-        memory: &mut Memory,
-        keystate_callback: &mut impl FnMut(u8) -> bool,
-        periphery: &mut Periphery,
-    ) {
+    pub fn execute_next_instruction(&mut self, memory: &mut Memory, periphery: &mut Periphery) {
         use crate::processor::Opcode::*;
         let opcode = memory.read_opcode(self.get_instruction_pointer());
         if let Err(err) = opcode {
@@ -462,7 +458,13 @@ impl Processor {
             },
             NoOp {} => {}
             GetKeyState { target, keycode } => {
-                self.registers[target] = keystate_callback(self.registers[keycode] as _).into();
+                self.registers[target] = matches!(
+                    periphery
+                        .keyboard
+                        .get_keystate(self.registers[keycode] as _),
+                    KeyState::Down
+                )
+                .into();
                 self.set_flag(Flag::Zero, self.registers[target] == 0);
             }
             PollTime { high, low } => {

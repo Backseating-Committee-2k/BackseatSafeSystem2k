@@ -1,3 +1,4 @@
+mod keyboard;
 mod machine;
 mod memory;
 mod opcodes;
@@ -7,12 +8,15 @@ mod terminal;
 mod timer;
 
 use std::{
+    cell::RefCell,
     env,
     error::Error,
     path::Path,
+    rc::Rc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use num_format::{CustomFormat, ToFormattedString};
 use periphery::Periphery;
@@ -90,17 +94,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
 
-    let (mut raylib_handle, thread) = raylib::init()
+    let (raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
         .build();
+    let raylib_handle = Rc::new(RefCell::new(raylib_handle));
+    let raylib_handle_copy = Rc::clone(&raylib_handle);
     let periphery = Periphery {
         timer: Timer::new(ms_since_epoch),
+        keyboard: Keyboard::new(Box::new(move |key| {
+            match raylib_handle_copy.borrow().is_key_down(
+                raylib::input::key_from_i32(key.try_into().expect("keycode out of range"))
+                    .expect("invalid keycode"),
+            ) {
+                true => KeyState::Down,
+                false => KeyState::Up,
+            }
+        })),
     };
     let mut machine = Machine::new(periphery);
     load_rom(&mut machine, rom_filename)?;
 
-    let font = raylib_handle.load_font(&thread, "./resources/CozetteVector.ttf")?;
+    let font = raylib_handle
+        .borrow_mut()
+        .load_font(&thread, "./resources/CozetteVector.ttf")?;
     let mut is_halted = false;
 
     let mut time_measurements = TimeMeasurements {
@@ -115,12 +132,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let custom_number_format = CustomFormat::builder().separator(" ").build()?;
 
-    while !raylib_handle.window_should_close() {
+    while !raylib_handle.borrow().window_should_close() {
         let current_time = ms_since_epoch();
         render_if_needed(
             current_time,
             &mut time_measurements,
-            &mut raylib_handle,
+            &mut raylib_handle.borrow_mut(),
             &thread,
             &machine,
             &font,
@@ -145,11 +162,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         for _ in 0..num_cycles {
-            execute_next_instruction(&mut is_halted, &mut machine, &mut |keycode| {
-                raylib_handle.is_key_down(
-                    raylib::input::key_from_i32(keycode.into()).expect("invalid keycode"),
-                )
-            });
+            execute_next_instruction(&mut is_halted, &mut machine);
         }
     }
     Ok(())
@@ -185,18 +198,14 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn execute_next_instruction(
-    is_halted: &mut bool,
-    machine: &mut Machine,
-    keystate_callback: &mut impl FnMut(u8) -> bool,
-) {
+fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine) {
     match (*is_halted, machine.is_halted()) {
         (false, true) => {
             *is_halted = true;
             println!("HALT AND CATCH FIRE");
         }
         (false, false) => {
-            machine.execute_next_instruction(keystate_callback);
+            machine.execute_next_instruction();
         }
         (_, _) => {}
     }

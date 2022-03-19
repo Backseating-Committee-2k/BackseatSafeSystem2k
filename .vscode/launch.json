@@ -20,7 +20,7 @@
                 }
             },
             "args": [
-                "./roms/game_of_life.backseat"
+                "./roms/keycode.backseat"
             ],
             "cwd": "${workspaceFolder}"
         },

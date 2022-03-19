@@ -1,6 +1,7 @@
 use crate::{Address, AsHalfWords, AsWords, Instruction, Register, Word};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(test)]
 use strum_macros::EnumIter;
 
 macro_rules! type_to_abbreviation {
@@ -174,7 +175,8 @@ macro_rules! opcodes {
             #[doc = concat!(" | `", stringify!($code), "\u{00a0}", stringify_registers!(($( $register_letter ),*) $(, $type)?), "` | ", $comment, " |")]
         )+
 
-        #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, EnumIter)]
+        #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+        #[cfg_attr(test, derive(EnumIter))]
         #[repr(u32)] // for the speeds (blame: slartibart)
         pub enum Opcode {
             $(

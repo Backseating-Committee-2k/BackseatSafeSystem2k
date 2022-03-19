@@ -1,4 +1,7 @@
 use crate::{Address, AsHalfWords, AsWords, Instruction, Register, Word};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use strum_macros::EnumIter;
 
 macro_rules! type_to_abbreviation {
     (immediate) => {
@@ -141,6 +144,15 @@ macro_rules! registers_to_instruction {
     };
 }
 
+macro_rules! type_to_opcode_type {
+    () => {
+        None
+    };
+    ($type:ident) => {
+        Some(stringify!($type))
+    };
+}
+
 macro_rules! opcodes {
     ( $({
         $identifier:ident,
@@ -161,7 +173,8 @@ macro_rules! opcodes {
         $(
             #[doc = concat!(" | `", stringify!($code), "\u{00a0}", stringify_registers!(($( $register_letter ),*) $(, $type)?), "` | ", $comment, " |")]
         )+
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+
+        #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, EnumIter)]
         #[repr(u32)] // for the speeds (blame: slartibart)
         pub enum Opcode {
             $(
@@ -169,7 +182,45 @@ macro_rules! opcodes {
             )+
         }
 
+        #[derive(Serialize)]
+        pub struct OpcodeDescription {
+            opcode: u16,
+            registers: Vec<(&'static str, &'static str)>,
+            opcode_type: Option<&'static str>,
+            cycles: usize,
+            should_increment: bool,
+            docstring: &'static str,
+        }
+
         impl Opcode {
+            pub fn as_hashmap() -> HashMap<&'static str, OpcodeDescription> {
+                let mut result = HashMap::new();
+                $(
+                    result.insert(stringify!($identifier), OpcodeDescription{
+                        opcode: $code,
+                        registers: vec![
+                            $(
+                                (stringify!($register_letter), stringify!($register_name)),
+                            )*
+                        ],
+                        opcode_type: type_to_opcode_type!($($type)?),
+                        cycles: $num_cycles,
+                        should_increment: matches!(Increment::$should_increment, Increment::Yes),
+                        docstring: $comment,
+                    });
+                )+
+                result
+            }
+
+            #[cfg(test)]
+            pub fn get_opcode(self) -> u16 {
+                match self {
+                    $(
+                        Self::$identifier{ .. } => $code,
+                    )+
+                }
+            }
+
             pub fn as_instruction(self) -> Instruction {
                 match self {
                     $(
@@ -311,3 +362,21 @@ opcodes!(
     // Timing
     { PollTime, 0x0033, registers(H high, L low); cycles = 1, Increment::Yes, "store the number of milliseconds since the UNIX epoch into registers high and low" },
 );
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn ensure_no_duplicate_opcodes() {
+        for (i, outer_opcode) in Opcode::iter().enumerate() {
+            for (j, inner_opcode) in Opcode::iter().enumerate() {
+                if i == j {
+                    continue;
+                }
+                assert_ne!(outer_opcode.get_opcode(), inner_opcode.get_opcode());
+            }
+        }
+    }
+}

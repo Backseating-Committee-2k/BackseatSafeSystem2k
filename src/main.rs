@@ -9,6 +9,7 @@ mod timer;
 
 use std::{
     cell::RefCell,
+    collections::HashMap,
     env,
     error::Error,
     io,
@@ -24,7 +25,10 @@ use opcodes::Opcode;
 use periphery::Periphery;
 use processor::Processor;
 use raylib::prelude::*;
+use serde::{Deserialize, Serialize};
 use timer::Timer;
+
+use crate::opcodes::OpcodeDescription;
 
 pub struct Size2D {
     width: i32,
@@ -49,7 +53,7 @@ pub type Word = u32;
 pub type HalfWord = u16;
 pub type Address = u32;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Register(pub u8);
 
 impl From<u8> for Register {
@@ -96,53 +100,85 @@ fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
 
-    if env::args().nth(1).unwrap() == "emit" {
-        if env::args().len() != 3 {
-            return Err("Please specify an output filename".into());
+    match env::args().nth(1).unwrap().as_str() {
+        "emit" => {
+            if env::args().len() != 3 {
+                return Err("Please specify an output filename".into());
+            }
+            save_opcodes_as_machine_code(
+                &[
+                    Opcode::MoveRegisterImmediate {
+                        register: 10.into(),
+                        immediate: 1000,
+                    },
+                    Opcode::MoveRegisterImmediate {
+                        register: 11.into(),
+                        immediate: 10,
+                    },
+                    Opcode::PollTime {
+                        high: 0xCC.into(),
+                        low: 1.into(),
+                    },
+                    Opcode::DivmodTargetModLhsRhs {
+                        result: 2.into(),
+                        remainder: 0xDD.into(),
+                        lhs: 1.into(),
+                        rhs: 10.into(),
+                    },
+                    Opcode::DivmodTargetModLhsRhs {
+                        result: 0xEE.into(),
+                        remainder: 3.into(),
+                        lhs: 2.into(),
+                        rhs: 11.into(),
+                    },
+                    Opcode::AddTargetSourceImmediate {
+                        target: 4.into(),
+                        source: 3.into(),
+                        immediate: b'0'.into(),
+                    },
+                    Opcode::MoveAddressRegister {
+                        register: 4.into(),
+                        address: 0x0,
+                    },
+                    Opcode::JumpAddress {
+                        address: Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address,
+                    },
+                ],
+                &env::args().nth(2).unwrap(),
+            )?;
+            return Ok(());
         }
-        save_opcodes_as_machine_code(
-            &[
-                Opcode::MoveRegisterImmediate {
-                    register: 10.into(),
-                    immediate: 1000,
-                },
-                Opcode::MoveRegisterImmediate {
-                    register: 11.into(),
-                    immediate: 10,
-                },
-                Opcode::PollTime {
-                    high: 0xCC.into(),
-                    low: 1.into(),
-                },
-                Opcode::DivmodTargetModLhsRhs {
-                    result: 2.into(),
-                    remainder: 0xDD.into(),
-                    lhs: 1.into(),
-                    rhs: 10.into(),
-                },
-                Opcode::DivmodTargetModLhsRhs {
-                    result: 0xEE.into(),
-                    remainder: 3.into(),
-                    lhs: 2.into(),
-                    rhs: 11.into(),
-                },
-                Opcode::AddTargetSourceImmediate {
-                    target: 4.into(),
-                    source: 3.into(),
-                    immediate: b'0'.into(),
-                },
-                Opcode::MoveAddressRegister {
-                    register: 4.into(),
-                    address: 0x0,
-                },
-                Opcode::JumpAddress {
-                    address: Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address,
-                },
-            ],
-            &env::args().nth(2).unwrap(),
-        )?;
-        return Ok(());
+        "json" => {
+            if env::args().len() != 3 {
+                return Err("Please specify an output filename".into());
+            }
+            #[derive(Serialize)]
+            struct JsonInfo {
+                opcodes: HashMap<&'static str, OpcodeDescription>,
+                constants: HashMap<&'static str, u64>,
+            }
+            let json_info = JsonInfo {
+                opcodes: Opcode::as_hashmap(),
+                constants: HashMap::from([
+                    ("ENTRY_POINT", Processor::ENTRY_POINT as _),
+                    ("NUM_REGISTERS", Processor::NUM_REGISTERS as _),
+                    ("CYCLE_COUNT_HIGH", Processor::CYCLE_COUNT_HIGH.0 as _),
+                    ("CYCLE_COUNT_LOW", Processor::CYCLE_COUNT_LOW.0 as _),
+                    ("FLAGS", Processor::FLAGS.0 as _),
+                    ("INSTRUCTION_POINTER", Processor::INSTRUCTION_POINTER.0 as _),
+                    ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
+                    ("STACK_START", Processor::STACK_START as _),
+                    ("STACK_SIZE", Processor::STACK_SIZE as _),
+                ]),
+            };
+            let json_string = serde_json::to_string_pretty(&json_info).unwrap();
+            std::fs::write(&env::args().nth(2).unwrap(), &json_string)?;
+            return Ok(());
+        }
+        _ => {}
     }
+
+    if env::args().nth(1).unwrap() == "emit" {}
 
     let (raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)

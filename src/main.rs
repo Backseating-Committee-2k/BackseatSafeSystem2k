@@ -11,6 +11,7 @@ use std::{
     cell::RefCell,
     env,
     error::Error,
+    io,
     path::Path,
     rc::Rc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -19,6 +20,7 @@ use std::{
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use num_format::{CustomFormat, ToFormattedString};
+use opcodes::Opcode;
 use periphery::Periphery;
 use processor::Processor;
 use raylib::prelude::*;
@@ -93,6 +95,54 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rom_filename = env::args()
         .nth(1)
         .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
+
+    if env::args().nth(1).unwrap() == "emit" {
+        if env::args().len() != 3 {
+            return Err("Please specify an output filename".into());
+        }
+        save_opcodes_as_machine_code(
+            &[
+                Opcode::MoveRegisterImmediate {
+                    register: 10.into(),
+                    immediate: 1000,
+                },
+                Opcode::MoveRegisterImmediate {
+                    register: 11.into(),
+                    immediate: 10,
+                },
+                Opcode::PollTime {
+                    high: 0xCC.into(),
+                    low: 1.into(),
+                },
+                Opcode::DivmodTargetModLhsRhs {
+                    result: 2.into(),
+                    remainder: 0xDD.into(),
+                    lhs: 1.into(),
+                    rhs: 10.into(),
+                },
+                Opcode::DivmodTargetModLhsRhs {
+                    result: 0xEE.into(),
+                    remainder: 3.into(),
+                    lhs: 2.into(),
+                    rhs: 11.into(),
+                },
+                Opcode::AddTargetSourceImmediate {
+                    target: 4.into(),
+                    source: 3.into(),
+                    immediate: b'0'.into(),
+                },
+                Opcode::MoveAddressRegister {
+                    register: 4.into(),
+                    address: 0x0,
+                },
+                Opcode::JumpAddress {
+                    address: Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address,
+                },
+            ],
+            &env::args().nth(2).unwrap(),
+        )?;
+        return Ok(());
+    }
 
     let (raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
@@ -209,6 +259,15 @@ fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine) {
         }
         (_, _) => {}
     }
+}
+
+fn save_opcodes_as_machine_code(instructions: &[Opcode], filename: &str) -> io::Result<()> {
+    let file_contents: Vec<_> = instructions
+        .iter()
+        .map(|opcode| opcode.as_instruction())
+        .flat_map(|instruction| instruction.to_be_bytes())
+        .collect();
+    std::fs::write(filename, &file_contents)
 }
 
 struct TimeMeasurements {

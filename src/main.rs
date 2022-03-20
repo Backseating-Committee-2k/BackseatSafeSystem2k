@@ -12,6 +12,7 @@ use std::{
     collections::HashMap,
     env,
     error::Error,
+    fmt::Debug,
     io,
     path::Path,
     rc::Rc,
@@ -99,7 +100,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rom_filename = env::args()
         .nth(1)
         .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
-
     match env::args().nth(1).unwrap().as_str() {
         "emit" => {
             if env::args().len() != 3 {
@@ -175,11 +175,33 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::fs::write(&env::args().nth(2).unwrap(), &json_string)?;
             return Ok(());
         }
+        "reverse" => {
+            if env::args().len() != 4 {
+                return Err("Please specify both an output and input filename".into());
+            }
+            let periphery = Periphery {
+                timer: Timer::new(ms_since_epoch),
+                keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
+            };
+            let mut machine = Machine::new(periphery);
+            let num_instructions = load_rom(&mut machine, env::args().nth(3).unwrap())?;
+            let mut disassembly = Vec::new();
+            for i in 0..num_instructions {
+                disassembly.push(format!(
+                    "{:?}",
+                    machine
+                        .memory
+                        .read_opcode(Processor::ENTRY_POINT + (i * Instruction::SIZE) as Address)
+                        .unwrap()
+                ));
+            }
+            std::fs::write(&env::args().nth(2).unwrap(), disassembly.join(",\n"))?;
+            return Ok(());
+        }
         _ => {}
     }
 
     if env::args().nth(1).unwrap() == "emit" {}
-
     let (raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
@@ -254,7 +276,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<usize, Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
     if buffer.len() % Instruction::SIZE != 0 {
         return Err(format!("Filesize must be divisible by {}", Instruction::SIZE).into());
@@ -262,6 +284,7 @@ fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box
     let iterator = buffer
         .chunks_exact(Instruction::SIZE)
         .map(|slice| Instruction::from_be_bytes(slice.try_into().unwrap()));
+    let num_instructions = iterator.len();
     for (instruction, address) in
         iterator.zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
     {
@@ -270,7 +293,7 @@ fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<(), Box
             instruction.try_into().expect("Invalid instruction"),
         );
     }
-    Ok(())
+    Ok(num_instructions)
 }
 
 fn duration_since_epoch() -> Duration {

@@ -20,7 +20,7 @@
                 }
             },
             "args": [
-                "./roms/keycode.backseat"
+                "reverse ./roms/emitter.opcodes ./roms/emitter.backseat"
             ],
             "cwd": "${workspaceFolder}"
         },

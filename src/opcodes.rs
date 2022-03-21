@@ -1,8 +1,6 @@
 use crate::{Address, AsHalfWords, AsWords, Instruction, Register, Word};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-#[cfg(test)]
-use strum_macros::EnumIter;
 
 macro_rules! type_to_abbreviation {
     (immediate) => {
@@ -176,7 +174,6 @@ macro_rules! opcodes {
         )+
 
         #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-        #[cfg_attr(test, derive(EnumIter))]
         #[repr(u32)] // for the speeds (blame: slartibart)
         pub enum Opcode {
             $(
@@ -212,15 +209,6 @@ macro_rules! opcodes {
                     });
                 )+
                 result
-            }
-
-            #[cfg(test)]
-            pub fn get_opcode(self) -> u16 {
-                match self {
-                    $(
-                        Self::$identifier{ .. } => $code,
-                    )+
-                }
             }
 
             pub fn as_instruction(self) -> Instruction {
@@ -265,6 +253,7 @@ macro_rules! opcodes {
                     ( immediate ) => { immediate };
                     ( address ) => { address };
                 }
+                #[deny(unreachable_patterns)]
                 match opcode {
                     $(
                         $code => {
@@ -364,21 +353,3 @@ opcodes!(
     // Timing
     { PollTime, 0x0033, registers(H high, L low); cycles = 1, Increment::Yes, "store the number of milliseconds since the UNIX epoch into registers high and low" },
 );
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use strum::IntoEnumIterator;
-
-    #[test]
-    fn ensure_no_duplicate_opcodes() {
-        for (i, outer_opcode) in Opcode::iter().enumerate() {
-            for (j, inner_opcode) in Opcode::iter().enumerate() {
-                if i == j {
-                    continue;
-                }
-                assert_ne!(outer_opcode.get_opcode(), inner_opcode.get_opcode());
-            }
-        }
-    }
-}

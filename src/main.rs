@@ -54,7 +54,7 @@ pub type Word = u32;
 pub type HalfWord = u16;
 pub type Address = u32;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Register(pub u8);
 
 impl From<u8> for Register {

@@ -10,15 +10,15 @@ mod timer;
 use std::{
     cell::RefCell,
     collections::HashMap,
-    env,
     error::Error,
-    fmt::Debug,
-    io,
-    path::Path,
+    fmt::{Debug, Write},
+    io::{self, Read},
+    path::{Path, PathBuf},
     rc::Rc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use clap::StructOpt;
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use num_format::{CustomFormat, ToFormattedString};
@@ -96,112 +96,177 @@ impl Size for Instruction {}
 impl Size for Word {}
 impl Size for HalfWord {}
 
+#[derive(clap::Subcommand, Debug)]
+enum Action {
+    /// Execute a ROM file (typically *.backseat)
+    Run {
+        /// The path to the ROM file to be executed
+        path: Option<PathBuf>,
+    },
+    /// Emit a sample program as machine code
+    Emit {
+        /// Output path of the machine code to be written
+        path: Option<PathBuf>,
+    },
+    /// Write the available opcodes and other information such as constants in JSON format    
+    Json {
+        /// Output path of the JSON file to be written
+        path: Option<PathBuf>,
+    },
+    /// Read machine code (binary) and output a list of Instructions in Rust syntax
+    Reverse {
+        /// The path of the file to be written
+        #[clap(short, long)]
+        output_path: Option<PathBuf>,
+        /// The path of the input file containing machine code
+        #[clap(short, long)]
+        input_path: Option<PathBuf>,
+    },
+}
+
+/// The reference implementation of the backseat-safe-system-2k
+#[derive(clap::Parser, Debug)]
+struct Args {
+    #[clap(subcommand)]
+    action: Action,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let rom_filename = env::args()
-        .nth(1)
-        .ok_or("Please specify the ROM to be loaded as a command line argument.")?;
-    match env::args().nth(1).unwrap().as_str() {
-        "emit" => {
-            if env::args().len() != 3 {
-                return Err("Please specify an output filename".into());
-            }
-            save_opcodes_as_machine_code(
-                &[
-                    Opcode::MoveRegisterImmediate {
-                        register: 10.into(),
-                        immediate: 1000,
-                    },
-                    Opcode::MoveRegisterImmediate {
-                        register: 11.into(),
-                        immediate: 10,
-                    },
-                    Opcode::PollTime {
-                        high: 0xCC.into(),
-                        low: 1.into(),
-                    },
-                    Opcode::DivmodTargetModLhsRhs {
-                        result: 2.into(),
-                        remainder: 0xDD.into(),
-                        lhs: 1.into(),
-                        rhs: 10.into(),
-                    },
-                    Opcode::DivmodTargetModLhsRhs {
-                        result: 0xEE.into(),
-                        remainder: 3.into(),
-                        lhs: 2.into(),
-                        rhs: 11.into(),
-                    },
-                    Opcode::AddTargetSourceImmediate {
-                        target: 4.into(),
-                        source: 3.into(),
-                        immediate: b'0'.into(),
-                    },
-                    Opcode::MoveAddressRegister {
-                        register: 4.into(),
-                        address: 0x0,
-                    },
-                    Opcode::JumpAddress {
-                        address: Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address,
-                    },
-                ],
-                &env::args().nth(2).unwrap(),
-            )?;
-            return Ok(());
-        }
-        "json" => {
-            if env::args().len() != 3 {
-                return Err("Please specify an output filename".into());
-            }
-            #[derive(Serialize)]
-            struct JsonInfo {
-                opcodes: HashMap<&'static str, OpcodeDescription>,
-                constants: HashMap<&'static str, u64>,
-            }
-            let json_info = JsonInfo {
-                opcodes: Opcode::as_hashmap(),
-                constants: HashMap::from([
-                    ("ENTRY_POINT", Processor::ENTRY_POINT as _),
-                    ("NUM_REGISTERS", Processor::NUM_REGISTERS as _),
-                    ("CYCLE_COUNT_HIGH", Processor::CYCLE_COUNT_HIGH.0 as _),
-                    ("CYCLE_COUNT_LOW", Processor::CYCLE_COUNT_LOW.0 as _),
-                    ("FLAGS", Processor::FLAGS.0 as _),
-                    ("INSTRUCTION_POINTER", Processor::INSTRUCTION_POINTER.0 as _),
-                    ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
-                    ("STACK_START", Processor::STACK_START as _),
-                    ("STACK_SIZE", Processor::STACK_SIZE as _),
-                ]),
-            };
-            let json_string = serde_json::to_string_pretty(&json_info).unwrap();
-            std::fs::write(&env::args().nth(2).unwrap(), &json_string)?;
-            return Ok(());
-        }
-        "reverse" => {
-            if env::args().len() != 4 {
-                return Err("Please specify both an output and input filename".into());
-            }
-            let periphery = Periphery {
-                timer: Timer::new(ms_since_epoch),
-                keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
-            };
-            let mut machine = Machine::new(periphery);
-            let num_instructions = load_rom(&mut machine, env::args().nth(3).unwrap())?;
-            let mut disassembly = Vec::new();
-            for i in 0..num_instructions {
-                disassembly.push(format!(
-                    "{:?}",
-                    machine
-                        .memory
-                        .read_opcode(Processor::ENTRY_POINT + (i * Instruction::SIZE) as Address)
-                        .unwrap()
-                ));
-            }
-            std::fs::write(&env::args().nth(2).unwrap(), disassembly.join(",\n"))?;
-            return Ok(());
-        }
-        _ => {}
+    let args = Args::parse();
+    match args.action {
+        Action::Run { path } => run(path.as_deref()),
+        Action::Emit { path } => emit(path.as_deref()),
+        Action::Json { path } => print_json(path.as_deref()),
+        Action::Reverse {
+            output_path,
+            input_path,
+        } => reverse(output_path.as_deref(), input_path.as_deref()),
+    }
+}
+
+fn reverse(
+    output_filename: Option<&Path>,
+    input_filename: Option<&Path>,
+) -> Result<(), Box<dyn Error>> {
+    let periphery = Periphery {
+        timer: Timer::new(ms_since_epoch),
+        keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
+    };
+    let mut machine = Machine::new(periphery);
+    let num_instructions = match input_filename {
+        Some(filename) => load_rom(&mut machine, filename)?,
+        None => load_from_stdin(&mut machine)?,
+    };
+
+    let mut output_string = String::new();
+    for i in 0..num_instructions {
+        writeln!(
+            &mut output_string,
+            "{:?}",
+            machine
+                .memory
+                .read_opcode(Processor::ENTRY_POINT + (i * Instruction::SIZE) as Address)
+                .unwrap()
+        )?;
     }
 
-    if env::args().nth(1).unwrap() == "emit" {}
+    match output_filename {
+        Some(filename) => std::fs::write(filename, &output_string)?,
+        None => println!("{output_string}"),
+    };
+    Ok(())
+}
+
+fn load_from_stdin(machine: &mut Machine) -> Result<usize, Box<dyn Error>> {
+    let instructions = read_machine_code_from_stdin()?;
+    write_buffer_as_instructions(&instructions, machine)
+}
+
+fn read_machine_code_from_stdin() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut instructions = Vec::new();
+    std::io::stdin().read_to_end(&mut instructions)?;
+    Ok(instructions)
+}
+
+fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
+    #[derive(Serialize)]
+    struct JsonInfo {
+        opcodes: HashMap<&'static str, OpcodeDescription>,
+        constants: HashMap<&'static str, u64>,
+    }
+
+    let json_info = JsonInfo {
+        opcodes: Opcode::as_hashmap(),
+        constants: HashMap::from([
+            ("ENTRY_POINT", Processor::ENTRY_POINT as _),
+            ("NUM_REGISTERS", Processor::NUM_REGISTERS as _),
+            ("CYCLE_COUNT_HIGH", Processor::CYCLE_COUNT_HIGH.0 as _),
+            ("CYCLE_COUNT_LOW", Processor::CYCLE_COUNT_LOW.0 as _),
+            ("FLAGS", Processor::FLAGS.0 as _),
+            ("INSTRUCTION_POINTER", Processor::INSTRUCTION_POINTER.0 as _),
+            ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
+            ("STACK_START", Processor::STACK_START as _),
+            ("STACK_SIZE", Processor::STACK_SIZE as _),
+        ]),
+    };
+    let json_string = serde_json::to_string_pretty(&json_info).unwrap();
+    match output_filename {
+        Some(filename) => std::fs::write(filename, &json_string)?,
+        None => println!("{json_string}"),
+    }
+
+    Ok(())
+}
+
+fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
+    let opcodes = &[
+        Opcode::MoveRegisterImmediate {
+            register: 10.into(),
+            immediate: 1000,
+        },
+        Opcode::MoveRegisterImmediate {
+            register: 11.into(),
+            immediate: 10,
+        },
+        Opcode::PollTime {
+            high: 0xCC.into(),
+            low: 1.into(),
+        },
+        Opcode::DivmodTargetModLhsRhs {
+            result: 2.into(),
+            remainder: 0xDD.into(),
+            lhs: 1.into(),
+            rhs: 10.into(),
+        },
+        Opcode::DivmodTargetModLhsRhs {
+            result: 0xEE.into(),
+            remainder: 3.into(),
+            lhs: 2.into(),
+            rhs: 11.into(),
+        },
+        Opcode::AddTargetSourceImmediate {
+            target: 4.into(),
+            source: 3.into(),
+            immediate: b'0'.into(),
+        },
+        Opcode::MoveAddressRegister {
+            register: 4.into(),
+            address: 0x0,
+        },
+        Opcode::JumpAddress {
+            address: Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address,
+        },
+    ];
+    let machine_code = opcodes_to_machine_code(opcodes);
+    match output_filename {
+        Some(filename) => save_opcodes_as_machine_code(opcodes, filename)?,
+        None => io::Write::write_all(&mut std::io::stdout(), &machine_code)?,
+    }
+
+    Ok(())
+}
+
+fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     let (raylib_handle, thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
@@ -220,8 +285,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         })),
     };
+
     let mut machine = Machine::new(periphery);
-    load_rom(&mut machine, rom_filename)?;
+
+    match rom_filename {
+        Some(filename) => load_rom(&mut machine, filename)?,
+        None => load_from_stdin(&mut machine)?,
+    };
 
     let font = raylib_handle
         .borrow_mut()
@@ -278,6 +348,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<usize, Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
+    write_buffer_as_instructions(&buffer, machine)
+}
+
+fn write_buffer_as_instructions(
+    buffer: &[u8],
+    machine: &mut Machine,
+) -> Result<usize, Box<dyn Error>> {
     if buffer.len() % Instruction::SIZE != 0 {
         return Err(format!("Filesize must be divisible by {}", Instruction::SIZE).into());
     }
@@ -320,12 +397,16 @@ fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine) {
     }
 }
 
-fn save_opcodes_as_machine_code(instructions: &[Opcode], filename: &str) -> io::Result<()> {
-    let file_contents: Vec<_> = instructions
+fn opcodes_to_machine_code(instructions: &[Opcode]) -> Vec<u8> {
+    instructions
         .iter()
         .map(|opcode| opcode.as_instruction())
         .flat_map(|instruction| instruction.to_be_bytes())
-        .collect();
+        .collect()
+}
+
+fn save_opcodes_as_machine_code(instructions: &[Opcode], filename: &Path) -> io::Result<()> {
+    let file_contents = opcodes_to_machine_code(instructions);
     std::fs::write(filename, &file_contents)
 }
 

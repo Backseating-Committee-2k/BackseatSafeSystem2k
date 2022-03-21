@@ -4,3 +4,6 @@ roms/keycode.backseat
 opcodes.json
 roms/emitter.backseat
 roms/emitter.opcodes
+roms/game_of_life.opcodes
+roms/reverse_test.opcodes
+roms/test.backseat

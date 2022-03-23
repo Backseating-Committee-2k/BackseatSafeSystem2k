@@ -366,6 +366,93 @@ mod tests {
         carry = true
     );
 
+    create_test!(
+        add_two_values_with_carry_with_no_flags_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [5 => 0, 37 => 1],
+        registers_post = [(0.into(), 5), (1.into(), 37), (2.into(), 42)],
+        flags_post = [(Carry, false), (Zero, false)],
+    );
+
+    create_test!(
+        add_two_values_with_carry_with_zero_flag_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [0 => 0, 0 => 1],
+        registers_post = [(0.into(), 0), (1.into(), 0), (2.into(), 0)],
+        flags_post = [(Carry, false), (Zero, true)],
+    );
+
+    create_test!(
+        add_two_values_with_carry_with_carry_flag_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [Word::MAX => 0, 5 => 1],
+        registers_post = [(0.into(), Word::MAX), (1.into(), 5), (2.into(), 4)],
+        flags_post = [(Carry, true), (Zero, false)],
+    );
+
+    create_test!(
+        add_two_values_with_carry_with_both_carry_and_zero_flags_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [Word::MAX => 0, 1 => 1],
+        registers_post = [(0.into(), Word::MAX), (1.into(), 1), (2.into(), 0)],
+        flags_post = [(Carry, true), (Zero, true)],
+    );
+
+    create_test!(
+        add_two_values_with_carry_when_carry_flag_is_already_set_with_no_flags_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [5 => 0, 36 => 1],
+        flags_pre = [true => Carry],
+        registers_post = [(0.into(), 5), (1.into(), 36), (2.into(), 42)],
+        flags_post = [(Carry, false), (Zero, false)],
+    );
+
+    create_test!(
+        add_two_values_with_carry_when_carry_flag_is_already_set_with_carry_flag_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [Word::MAX => 0, 1 => 1],
+        flags_pre = [true => Carry],
+        registers_post = [(0.into(), Word::MAX), (1.into(), 1), (2.into(), 1)],
+        flags_post = [(Carry, true), (Zero, false)],
+    );
+
+    create_test!(
+        add_two_values_with_carry_when_carry_flag_is_already_set_with_both_carry_and_zero_flags_set,
+        opcodes = &[Opcode::AddWithCarryTargetLhsRhs {
+            target: 2.into(),
+            lhs: 0.into(),
+            rhs: 1.into(),
+        }],
+        registers_pre = [Word::MAX => 0, 0 => 1],
+        flags_pre = [true => Carry],
+        registers_post = [(0.into(), Word::MAX), (1.into(), 0), (2.into(), 0)],
+        flags_post = [(Carry, true), (Zero, true)],
+    );
+
     macro_rules! create_subtraction_test{
         (
             $test_name:ident,

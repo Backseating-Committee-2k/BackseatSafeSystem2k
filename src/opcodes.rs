@@ -288,12 +288,13 @@ opcodes!(
     // halt and catch fire
     { HaltAndCatchFire, 0x0006, registers(); cycles = 1, Increment::No, "halt and catch fire" },
 
-    // arithmetic instructions
-    { AddTargetLhsRhs, 0x0007, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "add the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
-    { SubtractTargetLhsRhs, 0x0008, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "subtract (without carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
-    { SubtractWithCarryTargetLhsRhs, 0x0009, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "subtract (with carry) the values in registers LL and RR, store the result in TT, set zero and carry flags appropriately" },
-    { MultiplyHighLowLhsRhs, 0x000A, registers(H high, T low, L lhs, R rhs); cycles = 1, Increment::Yes, "multiply the values in registers LL and RR, store the low part of the result in TT, the high part in HH, set zero and carry flags appropriately" },
-    { DivmodTargetModLhsRhs, 0x000B, registers(D result, M remainder, L lhs, R rhs); cycles = 1, Increment::Yes, "divmod the values in registers LL and RR, store the result in DD and the remainder in MM set zero and divide-by-zero flags appropriately" },
+    // artimetic (sic!) instructions
+    { AddTargetLhsRhs, 0x0007, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "add the values in registers L and R, store the result in T, set zero and carry flags appropriately" },
+    { AddWithCarryTargetLhsRhs, 0x0034, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "add (with carry) the values in registers L and R, store the result in T, set zero and carry flags appropriately" },
+    { SubtractTargetLhsRhs, 0x0008, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "subtract (without carry) the values in registers L and R, store the result in T, set zero and carry flags appropriately" },
+    { SubtractWithCarryTargetLhsRhs, 0x0009, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "subtract (with carry) the values in registers L and R, store the result in T, set zero and carry flags appropriately" },
+    { MultiplyHighLowLhsRhs, 0x000A, registers(H high, T low, L lhs, R rhs); cycles = 1, Increment::Yes, "multiply the values in registers L and R, store the low part of the result in T, the high part in H, set zero and carry flags appropriately" },
+    { DivmodTargetModLhsRhs, 0x000B, registers(D result, M remainder, L lhs, R rhs); cycles = 1, Increment::Yes, "divmod the values in registers L and R, store the result in D and the remainder in M set zero and divide-by-zero flags appropriately" },
 
     // bitwise instructions
     { AndTargetLhsRhs, 0x000C, registers(T target, L lhs, R rhs); cycles = 1, Increment::Yes, "and the values in registers LL and RR, store the result in TT, set zero flag appropriately" },

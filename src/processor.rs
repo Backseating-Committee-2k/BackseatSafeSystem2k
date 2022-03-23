@@ -472,6 +472,18 @@ impl Processor {
                 self.registers[low] = time as Word;
                 self.registers[high] = (time >> Word::BITS) as Word;
             }
+            AddWithCarryTargetLhsRhs { target, lhs, rhs } => {
+                let result = self.registers[lhs]
+                    .wrapping_add(self.registers[rhs])
+                    .wrapping_add(self.get_flag(Flag::Carry).into());
+                let overflow_happened = (self.registers[lhs] as u64
+                    + self.registers[rhs] as u64
+                    + self.get_flag(Flag::Carry) as u64)
+                    > Word::MAX as u64;
+                self.registers[target] = result;
+                self.set_flag(Flag::Zero, self.registers[target] == 0);
+                self.set_flag(Flag::Carry, overflow_happened);
+            }
         }
         self.increase_cycle_count(opcode.get_num_cycles().into());
 

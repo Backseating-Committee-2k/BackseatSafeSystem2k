@@ -29,7 +29,7 @@ use raylib::prelude::*;
 use serde::{Deserialize, Serialize};
 use timer::Timer;
 
-use crate::opcodes::OpcodeDescription;
+use crate::{opcodes::OpcodeDescription, processor::Flag};
 
 pub struct Size2D {
     width: i32,
@@ -193,6 +193,7 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     struct JsonInfo {
         opcodes: HashMap<&'static str, OpcodeDescription>,
         constants: HashMap<&'static str, u64>,
+        flags: HashMap<&'static str, usize>,
     }
 
     let json_info = JsonInfo {
@@ -208,6 +209,7 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             ("STACK_START", Processor::STACK_START as _),
             ("STACK_SIZE", Processor::STACK_SIZE as _),
         ]),
+        flags: Flag::as_hashmap(),
     };
     let json_string = serde_json::to_string_pretty(&json_info).unwrap();
     match output_filename {

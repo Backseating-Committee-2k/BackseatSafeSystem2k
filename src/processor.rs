@@ -10,6 +10,7 @@ use crate::terminal;
 use crate::{memory::Memory, Address, Instruction, Word};
 use crate::{Register, Size};
 use bitflags::bitflags;
+use std::collections::HashMap;
 
 const _: () = static_assert(Processor::ENTRY_POINT as usize % Instruction::SIZE == 0);
 
@@ -18,13 +19,33 @@ pub enum Direction {
     Backwards,
 }
 
-bitflags! {
-    pub struct Flag: Word {
-        const Zero = 0b1 << 0;
-        const Carry = 0b1 << 1;
-        const DivideByZero = 0b1 << 2;
-    }
+macro_rules! define_flags {
+    ($(($flag_name:ident, shift = $shift:literal)),+) => {
+        bitflags! {
+            pub struct Flag: Word {
+                $(
+                    const $flag_name = 0b1 << $shift;
+                )+
+            }
+        }
+
+        impl Flag {
+            pub fn as_hashmap() -> HashMap<&'static str, usize> {
+                HashMap::from([
+                    $(
+                        (stringify!($flag_name), $shift),
+                    )+
+                ])
+            }
+        }
+    };
 }
+
+define_flags![
+    (Zero, shift = 0),
+    (Carry, shift = 1),
+    (DivideByZero, shift = 2)
+];
 
 pub struct Registers<const SIZE: usize>([Word; SIZE]);
 

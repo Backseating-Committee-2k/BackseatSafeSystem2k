@@ -1,9 +1,6 @@
 /target
-roms/hello_world.backseat.bak
-roms/keycode.backseat
 opcodes.json
-roms/emitter.backseat
-roms/emitter.opcodes
-roms/game_of_life.opcodes
-roms/reverse_test.opcodes
-roms/test.backseat
+roms/*
+!roms/counter.backseat
+!roms/game_of_life.backseat
+!roms/hello_world.backseat

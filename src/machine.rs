@@ -47,11 +47,11 @@ mod tests {
     use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
     use crate::timer::Timer;
+    use crate::{address_constants, Address, Instruction, Size, Word};
     use crate::{
         opcodes::Opcode::{self, *},
         Register,
     };
-    use crate::{Address, Instruction, Size, Word};
 
     use super::*;
 
@@ -134,7 +134,7 @@ mod tests {
         let mut machine = Machine::new(create_mock_periphery());
         for (&opcode, address) in opcodes
             .iter()
-            .zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
+            .zip((address_constants::ENTRY_POINT..).step_by(Instruction::SIZE))
         {
             machine.memory.write_opcode(address, opcode);
         }
@@ -174,7 +174,7 @@ mod tests {
         }],
         registers_post = [(
             Processor::INSTRUCTION_POINTER,
-            Processor::ENTRY_POINT + Instruction::SIZE as u32
+            address_constants::ENTRY_POINT + Instruction::SIZE as u32
         )],
     );
 
@@ -295,7 +295,10 @@ mod tests {
             }
         ],
         registers_post = [
-            (Processor::INSTRUCTION_POINTER, Processor::ENTRY_POINT),
+            (
+                Processor::INSTRUCTION_POINTER,
+                address_constants::ENTRY_POINT
+            ),
             (register, 0x0)
         ],
     );
@@ -1144,7 +1147,7 @@ mod tests {
         machine.processor.registers[source_register] = data;
         assert_eq!(
             machine.processor.get_stack_pointer(),
-            Processor::STACK_START
+            address_constants::STACK_START
         );
         let machine = execute_instruction_with_machine(
             machine,
@@ -1154,9 +1157,12 @@ mod tests {
         );
         assert_eq!(
             machine.processor.get_stack_pointer(),
-            Processor::STACK_START + Word::SIZE as Address
+            address_constants::STACK_START + Word::SIZE as Address
         );
-        assert_eq!(machine.memory.read_data(Processor::STACK_START), data);
+        assert_eq!(
+            machine.memory.read_data(address_constants::STACK_START),
+            data
+        );
         let machine = execute_instruction_with_machine(
             machine,
             PopRegister {
@@ -1165,7 +1171,7 @@ mod tests {
         );
         assert_eq!(
             machine.processor.get_stack_pointer(),
-            Processor::STACK_START
+            address_constants::STACK_START
         );
         assert_eq!(machine.processor.registers[target_register], data);
     }
@@ -1179,11 +1185,12 @@ mod tests {
             machine = execute_instruction_with_machine(machine, PushRegister { register });
             assert_eq!(
                 machine.processor.get_stack_pointer(),
-                Processor::STACK_START + (register.0 as Address + 1) * Word::SIZE as Address
+                address_constants::STACK_START
+                    + (register.0 as Address + 1) * Word::SIZE as Address
             );
             assert_eq!(
                 machine.memory.read_data(
-                    Processor::STACK_START + register.0 as Address * Word::SIZE as Address
+                    address_constants::STACK_START + register.0 as Address * Word::SIZE as Address
                 ),
                 value
             );
@@ -1195,16 +1202,16 @@ mod tests {
         }
         assert_eq!(
             machine.processor.get_stack_pointer(),
-            Processor::STACK_START
+            address_constants::STACK_START
         );
     }
 
     #[test]
     fn call_and_return() {
         let mut machine = Machine::new(create_mock_periphery());
-        let call_address = Processor::ENTRY_POINT + 200 * Instruction::SIZE as Address;
+        let call_address = address_constants::ENTRY_POINT + 200 * Instruction::SIZE as Address;
         machine.memory.write_opcode(
-            Processor::ENTRY_POINT,
+            address_constants::ENTRY_POINT,
             Opcode::CallAddress {
                 address: call_address,
             },
@@ -1225,8 +1232,8 @@ mod tests {
 
         machine.execute_next_instruction(); // jump into subroutine
         assert_eq!(
-            machine.memory.read_data(Processor::STACK_START),
-            Processor::ENTRY_POINT + Instruction::SIZE as Address
+            machine.memory.read_data(address_constants::STACK_START),
+            address_constants::ENTRY_POINT + Instruction::SIZE as Address
         );
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
@@ -1243,14 +1250,14 @@ mod tests {
         machine.execute_next_instruction(); // jump back from subroutine
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
-            Processor::ENTRY_POINT + Instruction::SIZE as Address
+            address_constants::ENTRY_POINT + Instruction::SIZE as Address
         );
     }
 
     create_test!(
         jump_to_address,
         setup = {
-            let address = Processor::ENTRY_POINT as Address + 42;
+            let address = address_constants::ENTRY_POINT as Address + 42;
         },
         opcodes = &[Opcode::JumpAddress { address }],
         registers_post = [(Processor::INSTRUCTION_POINTER, address)],
@@ -1260,7 +1267,7 @@ mod tests {
         jump_to_pointer,
         setup = {
             let register = Register(0xAB);
-            let address = Processor::ENTRY_POINT as Address + 42;
+            let address = address_constants::ENTRY_POINT as Address + 42;
         },
         opcodes = &[Opcode::JumpRegister { register }],
         registers_pre = [address => register],
@@ -1281,7 +1288,7 @@ mod tests {
             create_test!(
                 $address_test_name,
                 setup = {
-                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let target_address = address_constants::ENTRY_POINT + 42 * Instruction::SIZE as Address;
                     let target_register = 0.into();
                 },
                 opcodes = &[
@@ -1297,7 +1304,7 @@ mod tests {
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
                 registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
-                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                    address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Address
                 })],
             );
 
@@ -1305,7 +1312,7 @@ mod tests {
             create_test!(
                 $pointer_test_name,
                 setup = {
-                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let target_address = address_constants::ENTRY_POINT + 42 * Instruction::SIZE as Address;
                     let pointer_register = 0xA.into();
                     let comparison_register = 0.into();
                 },
@@ -1322,7 +1329,7 @@ mod tests {
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2, target_address => pointer_register],
                 registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
-                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                    address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Address
                 })],
             );
         };
@@ -1479,7 +1486,7 @@ mod tests {
             create_test!(
                 $test_name,
                 setup = {
-                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let target_address = address_constants::ENTRY_POINT + 42 * Instruction::SIZE as Address;
                     let high_register = 3.into();
                     let target_register = 0.into();
                 },
@@ -1496,7 +1503,7 @@ mod tests {
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
                 registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
-                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                    address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Address
                 })],
             );
         }
@@ -1577,7 +1584,7 @@ mod tests {
             create_test!(
                 $test_name,
                 setup = {
-                    let target_address = Processor::ENTRY_POINT + 42 * Instruction::SIZE as Address;
+                    let target_address = address_constants::ENTRY_POINT + 42 * Instruction::SIZE as Address;
                     let remainder_register = 3.into();
                     let target_register = 0.into();
                 },
@@ -1594,7 +1601,7 @@ mod tests {
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
                 registers_post = [(Processor::INSTRUCTION_POINTER, if $should_jump { target_address } else {
-                    Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address
+                    address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Address
                 })],
             );
         };
@@ -1637,7 +1644,7 @@ mod tests {
         opcodes = &[NoOp {}],
         registers_post = [(
             Processor::INSTRUCTION_POINTER,
-            Processor::ENTRY_POINT + Instruction::SIZE as Address
+            address_constants::ENTRY_POINT + Instruction::SIZE as Address
         )],
     );
 

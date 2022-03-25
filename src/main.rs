@@ -1,3 +1,5 @@
+mod address_constants;
+mod display;
 mod keyboard;
 mod machine;
 mod memory;
@@ -165,7 +167,7 @@ fn reverse(
             "{:?}",
             machine
                 .memory
-                .read_opcode(Processor::ENTRY_POINT + (i * Instruction::SIZE) as Address)
+                .read_opcode(address_constants::ENTRY_POINT + (i * Instruction::SIZE) as Address)
                 .unwrap()
         )?;
     }
@@ -199,15 +201,15 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     let json_info = JsonInfo {
         opcodes: Opcode::as_hashmap(),
         constants: HashMap::from([
-            ("ENTRY_POINT", Processor::ENTRY_POINT as _),
+            ("ENTRY_POINT", address_constants::ENTRY_POINT as _),
             ("NUM_REGISTERS", Processor::NUM_REGISTERS as _),
             ("CYCLE_COUNT_HIGH", Processor::CYCLE_COUNT_HIGH.0 as _),
             ("CYCLE_COUNT_LOW", Processor::CYCLE_COUNT_LOW.0 as _),
             ("FLAGS", Processor::FLAGS.0 as _),
             ("INSTRUCTION_POINTER", Processor::INSTRUCTION_POINTER.0 as _),
             ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
-            ("STACK_START", Processor::STACK_START as _),
-            ("STACK_SIZE", Processor::STACK_SIZE as _),
+            ("STACK_START", address_constants::STACK_START as _),
+            ("STACK_SIZE", address_constants::STACK_SIZE as _),
         ]),
         flags: Flag::as_hashmap(),
     };
@@ -256,7 +258,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             address: 0x0,
         },
         Opcode::JumpAddress {
-            address: Processor::ENTRY_POINT + 2 * Instruction::SIZE as Address,
+            address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Address,
         },
     ];
     let machine_code = opcodes_to_machine_code(opcodes);
@@ -365,7 +367,7 @@ fn write_buffer_as_instructions(
         .map(|slice| Instruction::from_be_bytes(slice.try_into().unwrap()));
     let num_instructions = iterator.len();
     for (instruction, address) in
-        iterator.zip((Processor::ENTRY_POINT..).step_by(Instruction::SIZE))
+        iterator.zip((address_constants::ENTRY_POINT..).step_by(Instruction::SIZE))
     {
         machine.memory.write_opcode(
             address,

@@ -2,17 +2,17 @@
 
 use std::ops::{Index, IndexMut};
 
+use crate::address_constants;
 use crate::keyboard::KeyState;
 use crate::opcodes::Opcode;
 use crate::periphery::Periphery;
 use crate::static_assert;
-use crate::terminal;
 use crate::{memory::Memory, Address, Instruction, Word};
 use crate::{Register, Size};
 use bitflags::bitflags;
 use std::collections::HashMap;
 
-const _: () = static_assert(Processor::ENTRY_POINT as usize % Instruction::SIZE == 0);
+const _: () = static_assert(address_constants::ENTRY_POINT as usize % Instruction::SIZE == 0);
 
 pub enum Direction {
     Forwards,
@@ -78,17 +78,13 @@ impl Processor {
     pub const FLAGS: Register = Register((Self::NUM_REGISTERS - 3) as _);
     pub const INSTRUCTION_POINTER: Register = Register((Self::NUM_REGISTERS - 2) as _);
     pub const STACK_POINTER: Register = Register((Self::NUM_REGISTERS - 1) as _);
-    pub const STACK_START: Address =
-        (terminal::WIDTH * terminal::HEIGHT + 2) as Address * Word::SIZE as Address;
-    pub const STACK_SIZE: usize = 512 * 1024;
-    pub const ENTRY_POINT: Address = Self::STACK_START + Self::STACK_SIZE as Address; // gonna change!
 
     pub fn new() -> Self {
         let mut result = Self {
             registers: Registers([0; Self::NUM_REGISTERS]),
         };
-        result.registers[Self::INSTRUCTION_POINTER] = Self::ENTRY_POINT;
-        result.registers[Self::STACK_POINTER] = Self::STACK_START;
+        result.registers[Self::INSTRUCTION_POINTER] = address_constants::ENTRY_POINT;
+        result.registers[Self::STACK_POINTER] = address_constants::STACK_START;
         result
     }
 
@@ -107,10 +103,9 @@ impl Processor {
     }
 
     pub fn set_stack_pointer(&mut self, address: Address) {
-        debug_assert!(
-            (Self::STACK_START..=Self::STACK_START + Self::STACK_SIZE as Address)
-                .contains(&address)
-        );
+        debug_assert!((address_constants::STACK_START
+            ..=address_constants::STACK_START + address_constants::STACK_SIZE as Address)
+            .contains(&address));
         self.registers[Self::STACK_POINTER] = address;
     }
 

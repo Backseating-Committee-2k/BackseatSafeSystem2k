@@ -233,7 +233,7 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 }
 
 fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
-    let opcodes = &[
+    /*let opcodes = &[
         Opcode::MoveRegisterImmediate {
             // starting color
             register: 0.into(),
@@ -287,7 +287,8 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
         Opcode::JumpAddress {
             address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
         },
-    ];
+    ];*/
+    let opcodes = &[Opcode::HaltAndCatchFire {}];
     let machine_code = opcodes_to_machine_code(opcodes);
     match output_filename {
         Some(filename) => save_opcodes_as_machine_code(opcodes, filename)?,
@@ -327,7 +328,6 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     let font = raylib_handle
         .borrow_mut()
         .load_font(&raylib_thread, "./resources/CozetteVector.ttf")?;
-    let mut is_halted = false;
 
     let mut time_measurements = TimeMeasurements {
         next_render_time: ms_since_epoch(),
@@ -371,7 +371,7 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
         };
 
         for _ in 0..num_cycles {
-            execute_next_instruction(&mut is_halted, &mut machine);
+            execute_next_instruction(&mut machine);
         }
     }
     Ok(())
@@ -418,16 +418,9 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine<Display>) {
-    match (*is_halted, machine.is_halted()) {
-        (false, true) => {
-            *is_halted = true;
-            println!("HALT AND CATCH FIRE");
-        }
-        (false, false) => {
-            machine.execute_next_instruction();
-        }
-        (_, _) => {}
+fn execute_next_instruction(machine: &mut Machine<Display>) {
+    if !machine.is_halted() {
+        machine.execute_next_instruction();
     }
 }
 

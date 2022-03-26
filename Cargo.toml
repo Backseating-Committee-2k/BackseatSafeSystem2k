@@ -5,6 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.release]
+debug = 1
+
 [dependencies]
 raylib = { version = "3.7", git = "https://github.com/deltaphc/raylib-rs" }
 bitflags = "1.3"

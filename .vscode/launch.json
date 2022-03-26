@@ -20,7 +20,8 @@
                 }
             },
             "args": [
-                "reverse ./roms/emitter.opcodes ./roms/emitter.backseat"
+                "run",
+                "./roms/halt.backseat"
             ],
             "cwd": "${workspaceFolder}"
         },

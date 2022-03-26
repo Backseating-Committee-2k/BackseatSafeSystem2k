@@ -9,6 +9,7 @@ pub struct Machine<Display> {
     pub processor: Processor,
     pub display: Display,
     pub periphery: Periphery,
+    is_halted: bool,
 }
 
 impl<Display: Render> Machine<Display> {
@@ -20,6 +21,7 @@ impl<Display: Render> Machine<Display> {
             processor: Processor::new(),
             display,
             periphery,
+            is_halted: false,
         }
     }
 
@@ -29,21 +31,18 @@ impl<Display: Render> Machine<Display> {
     }
 
     pub fn execute_next_instruction(&mut self) {
-        self.processor
-            .execute_next_instruction(&mut self.memory, &mut self.periphery);
+        use crate::processor::ExecutionResult::*;
+        if let Halted = self
+            .processor
+            .execute_next_instruction(&mut self.memory, &mut self.periphery)
+        {
+            self.is_halted = true;
+        }
     }
 
     #[must_use = "Am I a joke to you?"]
     pub fn is_halted(&self) -> bool {
-        let opcode = self.read_opcode_at_instruction_pointer();
-        matches!(opcode, Ok(Opcode::HaltAndCatchFire {}))
-    }
-
-    fn read_opcode_at_instruction_pointer(
-        &self,
-    ) -> Result<Opcode, <Opcode as TryFrom<Instruction>>::Error> {
-        self.memory
-            .read_opcode(self.processor.registers[Processor::INSTRUCTION_POINTER])
+        self.is_halted
     }
 }
 

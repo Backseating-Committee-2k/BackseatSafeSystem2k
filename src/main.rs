@@ -220,6 +220,18 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
                 address_constants::SECOND_FRAMBUFFER_START as _,
             ),
             ("FRAMEBUFFER_SIZE", address_constants::FRAMEBUFFER_SIZE as _),
+            ("TERMINAL_WIDTH", terminal::WIDTH as _),
+            ("TERMINAL_HEIGHT", terminal::HEIGHT as _),
+            (
+                "TERMINAL_BUFFER_SIZE",
+                address_constants::TERMINAL_BUFFER_SIZE as _,
+            ),
+            (
+                "TERMINAL_BUFFER_START",
+                address_constants::TERMINAL_BUFFER_START as _,
+            ),
+            ("DISPLAY_WIDTH", display::WIDTH as _),
+            ("DISPLAY_HEIGHT", display::HEIGHT as _),
         ]),
         flags: Flag::as_hashmap(),
     };

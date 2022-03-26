@@ -1,6 +1,5 @@
 use crate::{
-    display::Render, memory::Memory, opcodes::Opcode, periphery::Periphery, processor::Processor,
-    terminal, Instruction,
+    display::Render, memory::Memory, periphery::Periphery, processor::Processor, terminal,
 };
 use raylib::prelude::*;
 

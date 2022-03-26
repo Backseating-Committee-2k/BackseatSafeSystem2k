@@ -1,7 +1,9 @@
+use std::ffi::c_void;
+
 use crate::{opcodes::Opcode, Address, Instruction, Size, Word};
 
 pub struct Memory {
-    data: Vec<Word>,
+    data: Vec<u8>,
 }
 
 impl Memory {
@@ -13,9 +15,8 @@ impl Memory {
         }
     }
 
-    fn address_to_word_index(address: Address) -> usize {
-        debug_assert!(address as usize % Address::SIZE == 0);
-        address as usize / Address::SIZE
+    pub fn as_mut_pointer(&mut self) -> *mut c_void {
+        self.data.as_mut_ptr() as *mut c_void
     }
 
     pub fn read_opcode(
@@ -23,43 +24,28 @@ impl Memory {
         address: Address,
     ) -> Result<Opcode, <Opcode as TryFrom<Instruction>>::Error> {
         debug_assert!(address as usize % Instruction::SIZE == 0);
-        let word_index = Self::address_to_word_index(address);
-        let slice = &self.data[word_index..][..Instruction::SIZE / Word::SIZE];
-        let mut instruction = 0;
-        for &word in slice {
-            instruction = (instruction << (8 * Word::SIZE)) | word as Instruction;
-        }
+        let slice = &self.data[address as usize..][..Instruction::SIZE];
+        let instruction = Instruction::from_be_bytes(slice.try_into().unwrap());
         instruction.try_into()
     }
 
     pub fn read_data(&self, address: Address) -> Word {
-        self.data[Self::address_to_word_index(address)]
+        debug_assert!(address as usize % Word::SIZE == 0);
+        let slice = &self.data[address as usize..][..Word::SIZE];
+        Word::from_be_bytes(slice.try_into().unwrap())
     }
 
     pub fn write_opcode(&mut self, address: Address, opcode: Opcode) {
         debug_assert!(address as usize % Instruction::SIZE == 0);
-        let mut instruction = opcode.as_instruction();
-        let word_index = Self::address_to_word_index(address);
-        let bit_mask = Word::MAX as Instruction;
-        for index in (word_index..word_index + Instruction::SIZE / Word::SIZE).rev() {
-            self.data[index] = (instruction & bit_mask) as Word;
-            instruction >>= 8 * Word::SIZE;
-        }
+        let instruction = opcode.as_instruction();
+
+        self.data[address as usize..][..Instruction::SIZE]
+            .copy_from_slice(&instruction.to_be_bytes());
     }
 
     pub fn write_data(&mut self, address: Address, data: Word) {
-        self.data[Self::address_to_word_index(address)] = data;
-    }
-}
-
-impl<Index> std::ops::Index<Index> for Memory
-where
-    Index: std::slice::SliceIndex<[Address]>,
-{
-    type Output = Index::Output;
-
-    fn index(&self, index: Index) -> &Self::Output {
-        &self.data[index]
+        debug_assert!(address as usize % Word::SIZE == 0);
+        self.data[address as usize..][..Word::SIZE].copy_from_slice(&data.to_be_bytes());
     }
 }
 

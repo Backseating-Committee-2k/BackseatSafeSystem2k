@@ -21,6 +21,7 @@ use std::{
 };
 
 use clap::StructOpt;
+use display::Display;
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use num_format::{CustomFormat, ToFormattedString};
@@ -39,8 +40,8 @@ pub struct Size2D {
 }
 
 pub const SCREEN_SIZE: Size2D = Size2D {
-    width: 1600,
-    height: 900,
+    width: 1280,
+    height: 720,
 };
 
 pub const OPCODE_LENGTH: usize = 16;
@@ -179,7 +180,7 @@ fn reverse(
     Ok(())
 }
 
-fn load_from_stdin(machine: &mut Machine) -> Result<usize, Box<dyn Error>> {
+fn load_from_stdin(machine: &mut Machine<Display>) -> Result<usize, Box<dyn Error>> {
     let instructions = read_machine_code_from_stdin()?;
     write_buffer_as_instructions(&instructions, machine)
 }
@@ -210,6 +211,15 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
             ("STACK_START", address_constants::STACK_START as _),
             ("STACK_SIZE", address_constants::STACK_SIZE as _),
+            (
+                "FIRST_FRAMEBUFFER_START",
+                address_constants::FIRST_FRAMEBUFFER_START as _,
+            ),
+            (
+                "SECOND_FRAMEBUFFER_START",
+                address_constants::SECOND_FRAMBUFFER_START as _,
+            ),
+            ("FRAMEBUFFER_SIZE", address_constants::FRAMEBUFFER_SIZE as _),
         ]),
         flags: Flag::as_hashmap(),
     };
@@ -225,40 +235,57 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     let opcodes = &[
         Opcode::MoveRegisterImmediate {
-            register: 10.into(),
-            immediate: 1000,
+            // starting color
+            register: 0.into(),
+            immediate: 0xFF,
         },
         Opcode::MoveRegisterImmediate {
-            register: 11.into(),
-            immediate: 10,
+            // num iterations
+            register: 42.into(),
+            immediate: 129600,
         },
-        Opcode::PollTime {
-            high: 0xCC.into(),
-            low: 1.into(),
-        },
-        Opcode::DivmodTargetModLhsRhs {
-            result: 2.into(),
-            remainder: 0xDD.into(),
-            lhs: 1.into(),
-            rhs: 10.into(),
-        },
-        Opcode::DivmodTargetModLhsRhs {
-            result: 0xEE.into(),
-            remainder: 3.into(),
-            lhs: 2.into(),
-            rhs: 11.into(),
+        // outer loop start
+        Opcode::MoveRegisterImmediate {
+            // current loop counter
+            register: 1.into(),
+            immediate: 0,
         },
         Opcode::AddTargetSourceImmediate {
-            target: 4.into(),
-            source: 3.into(),
-            immediate: b'0'.into(),
+            // current color
+            target: 0.into(),
+            source: 0.into(),
+            immediate: 0x100,
         },
-        Opcode::MoveAddressRegister {
-            register: 4.into(),
-            address: 0x0,
+        Opcode::MoveRegisterImmediate {
+            register: 2.into(),
+            immediate: address_constants::FIRST_FRAMEBUFFER_START,
+        },
+        // inner loop start
+        Opcode::MovePointerSource {
+            pointer: 2.into(),
+            source: 0.into(),
+        },
+        Opcode::AddTargetSourceImmediate {
+            target: 2.into(),
+            source: 2.into(),
+            immediate: Word::SIZE as Word,
+        },
+        Opcode::AddTargetSourceImmediate {
+            target: 1.into(),
+            source: 1.into(),
+            immediate: 1,
+        },
+        Opcode::CompareTargetLhsRhs {
+            target: 10.into(),
+            lhs: 1.into(),
+            rhs: 42.into(),
+        },
+        Opcode::JumpAddressIfLessThan {
+            comparison: 10.into(),
+            address: address_constants::ENTRY_POINT + 5 * Instruction::SIZE as Word,
         },
         Opcode::JumpAddress {
-            address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Address,
+            address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
         },
     ];
     let machine_code = opcodes_to_machine_code(opcodes);
@@ -271,7 +298,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 }
 
 fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
-    let (raylib_handle, thread) = raylib::init()
+    let (raylib_handle, raylib_thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
         .build();
@@ -299,7 +326,7 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 
     let font = raylib_handle
         .borrow_mut()
-        .load_font(&thread, "./resources/CozetteVector.ttf")?;
+        .load_font(&raylib_thread, "./resources/CozetteVector.ttf")?;
     let mut is_halted = false;
 
     let mut time_measurements = TimeMeasurements {
@@ -320,8 +347,8 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             current_time,
             &mut time_measurements,
             &mut raylib_handle.borrow_mut(),
-            &thread,
-            &machine,
+            &raylib_thread,
+            &mut machine,
             &font,
             &custom_number_format,
         );
@@ -350,14 +377,17 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn load_rom(machine: &mut Machine, filename: impl AsRef<Path>) -> Result<usize, Box<dyn Error>> {
+fn load_rom(
+    machine: &mut Machine<Display>,
+    filename: impl AsRef<Path>,
+) -> Result<usize, Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
     write_buffer_as_instructions(&buffer, machine)
 }
 
 fn write_buffer_as_instructions(
     buffer: &[u8],
-    machine: &mut Machine,
+    machine: &mut Machine<Display>,
 ) -> Result<usize, Box<dyn Error>> {
     if buffer.len() % Instruction::SIZE != 0 {
         return Err(format!("Filesize must be divisible by {}", Instruction::SIZE).into());
@@ -388,7 +418,7 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine) {
+fn execute_next_instruction(is_halted: &mut bool, machine: &mut Machine<Display>) {
     match (*is_halted, machine.is_halted()) {
         (false, true) => {
             *is_halted = true;
@@ -429,7 +459,7 @@ fn render_if_needed(
     time_measurements: &mut TimeMeasurements,
     raylib_handle: &mut RaylibHandle,
     thread: &RaylibThread,
-    machine: &Machine,
+    machine: &mut Machine<Display>,
     font: &Font,
     custom_number_format: &CustomFormat,
 ) {
@@ -454,7 +484,7 @@ fn render_if_needed(
     }
 }
 
-fn render(draw_handle: &mut RaylibDrawHandle, machine: &Machine, font: &Font) {
+fn render(draw_handle: &mut RaylibDrawHandle, machine: &mut Machine<Display>, font: &Font) {
     draw_handle.clear_background(Color::BLACK);
     machine.render(draw_handle, font);
     draw_handle.draw_fps(SCREEN_SIZE.width - 150, 10);

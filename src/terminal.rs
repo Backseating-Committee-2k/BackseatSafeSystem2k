@@ -1,6 +1,6 @@
 // featuring Tom Hanks
 
-use crate::memory::Memory;
+use crate::{address_constants, memory::Memory, Address, Size, Word};
 use raylib::prelude::*;
 
 pub const WIDTH: usize = 80;
@@ -14,10 +14,15 @@ pub fn render(
     font_height: f32,
 ) {
     for row in 0..HEIGHT {
-        let words = &memory[row * WIDTH..][..WIDTH];
-        let string: String = words
-            .iter()
-            .map(|&word| {
+        // let words = &memory[row * WIDTH..][..WIDTH];
+        let string: String = (0..WIDTH)
+            .map(|i| {
+                memory.read_data(
+                    address_constants::TERMINAL_BUFFER_START
+                        + (row * WIDTH * Word::SIZE + i * Word::SIZE) as Address,
+                )
+            })
+            .map(|word| {
                 if !(32..=255).contains(&word) {
                     b' '
                 } else {

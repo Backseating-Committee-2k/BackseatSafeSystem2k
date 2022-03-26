@@ -1,25 +1,30 @@
 use crate::{
-    memory::Memory, opcodes::Opcode, periphery::Periphery, processor::Processor, terminal,
-    Instruction,
+    display::Render, memory::Memory, opcodes::Opcode, periphery::Periphery, processor::Processor,
+    terminal, Instruction,
 };
 use raylib::prelude::*;
 
-pub struct Machine {
+pub struct Machine<Display> {
     pub memory: Memory,
     pub processor: Processor,
+    pub display: Display,
     pub periphery: Periphery,
 }
 
-impl Machine {
+impl<Display: Render> Machine<Display> {
     pub fn new(periphery: Periphery) -> Self {
+        let mut memory = Memory::new();
+        let display = Display::new(&mut memory);
         Self {
-            memory: Memory::new(),
+            memory,
             processor: Processor::new(),
+            display,
             periphery,
         }
     }
 
-    pub fn render(&self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
+    pub fn render(&mut self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
+        self.display.render(&mut self.memory);
         terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
     }
 
@@ -44,6 +49,7 @@ impl Machine {
 
 #[cfg(test)]
 mod tests {
+    use crate::display::MockDisplay;
     use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
     use crate::timer::Timer;
@@ -130,7 +136,7 @@ mod tests {
         };
     }
 
-    fn create_machine_with_opcodes(opcodes: &[Opcode]) -> Machine {
+    fn create_machine_with_opcodes(opcodes: &[Opcode]) -> Machine<MockDisplay> {
         let mut machine = Machine::new(create_mock_periphery());
         for (&opcode, address) in opcodes
             .iter()
@@ -141,7 +147,10 @@ mod tests {
         machine
     }
 
-    fn execute_instruction_with_machine(mut machine: Machine, opcode: Opcode) -> Machine {
+    fn execute_instruction_with_machine(
+        mut machine: Machine<MockDisplay>,
+        opcode: Opcode,
+    ) -> Machine<MockDisplay> {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
         machine
@@ -1208,7 +1217,7 @@ mod tests {
 
     #[test]
     fn call_and_return() {
-        let mut machine = Machine::new(create_mock_periphery());
+        let mut machine: Machine<MockDisplay> = Machine::new(create_mock_periphery());
         let call_address = address_constants::ENTRY_POINT + 200 * Instruction::SIZE as Address;
         machine.memory.write_opcode(
             address_constants::ENTRY_POINT,

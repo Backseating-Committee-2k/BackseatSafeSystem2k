@@ -1,7 +1,11 @@
-use std::{array::IntoIter, iter::Cycle};
+use raylib::{
+    ffi::RenderTexture,
+    prelude::{RaylibDraw, RaylibDrawHandle},
+    texture::{RaylibTexture2D, RenderTexture2D},
+};
 
 use crate::{
-    address_constants::{self, FIRST_FRAMEBUFFER_START, SECOND_FRAMBUFFER_START},
+    address_constants::{self, FIRST_FRAMEBUFFER_START, SECOND_FRAMEBUFFER_START},
     memory::Memory,
     Address, SCREEN_SIZE,
 };
@@ -9,90 +13,115 @@ use crate::{
 pub const WIDTH: usize = 480;
 pub const HEIGHT: usize = WIDTH / 4 * 3;
 
-pub trait Render {
-    fn new(memory: &mut Memory) -> Self;
-    fn render(&self, memory: &mut Memory);
+pub trait Display {
+    type Handle;
+    type Thread;
+
+    fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self;
+    fn swap(&mut self);
+    fn is_first_framebuffer_visible(&self) -> bool;
+    fn render(&mut self, memory: &mut Memory, handle: &mut RaylibDrawHandle);
+
+    fn invisible_framebuffer_address(&self) -> Address {
+        match self.is_first_framebuffer_visible() {
+            true => address_constants::SECOND_FRAMEBUFFER_START,
+            false => address_constants::FIRST_FRAMEBUFFER_START,
+        }
+    }
 }
 
-pub struct MockDisplay {}
+pub struct MockDisplay {
+    first_framebuffer_visible: bool,
+}
 
-impl Render for MockDisplay {
-    fn render(&self, _: &mut Memory) {
+impl Display for MockDisplay {
+    type Handle = ();
+    type Thread = ();
+
+    fn new(_: &mut Self::Handle, _: &Self::Thread) -> Self {
+        Self {
+            first_framebuffer_visible: true,
+        }
+    }
+
+    fn swap(&mut self) {
+        self.first_framebuffer_visible = !self.first_framebuffer_visible
+    }
+
+    fn is_first_framebuffer_visible(&self) -> bool {
+        self.first_framebuffer_visible
+    }
+
+    fn render(&mut self, memory: &mut Memory, _: &mut RaylibDrawHandle) {
         // do nothing
     }
+}
 
-    fn new(_: &mut Memory) -> Self {
-        Self {}
+pub struct DisplayImplementation {
+    first_framebuffer_visible: bool,
+    texture: RenderTexture2D,
+}
+
+impl DisplayImplementation {
+    fn first_framebuffer_visible_to_address(first_framebuffer_visible: bool) -> Address {
+        match first_framebuffer_visible {
+            true => FIRST_FRAMEBUFFER_START,
+            false => SECOND_FRAMEBUFFER_START,
+        }
     }
-}
 
-pub struct Display {
-    visible_framebuffer: Cycle<IntoIter<Address, 2>>,
-    texture: raylib::ffi::Texture,
-}
-
-impl Display {
-    fn create_image_struct_from_memory(memory: &mut Memory, offset: Address) -> raylib::ffi::Image {
-        if offset + address_constants::FRAMEBUFFER_SIZE as Address > Memory::SIZE as Address {
-            panic!();
-        }
-        let address = unsafe { memory.as_mut_pointer().offset(offset as isize) };
-        dbg!(address);
-        raylib::ffi::Image {
-            data: address,
-            width: WIDTH as i32,
-            height: HEIGHT as i32,
-            mipmaps: 1,
-            format: raylib::ffi::PixelFormat::PIXELFORMAT_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32,
-        }
+    fn visible_framebuffer(&self) -> Address {
+        Self::first_framebuffer_visible_to_address(self.first_framebuffer_visible)
     }
 
     fn invisible_framebuffer(&self) -> Address {
-        self.visible_framebuffer.clone().next().unwrap() // should not be able to fail since iterator is a cycle
+        Self::first_framebuffer_visible_to_address(!self.first_framebuffer_visible)
     }
 }
 
-impl Render for Display {
-    fn new(memory: &mut Memory) -> Self {
-        let image_struct = Self::create_image_struct_from_memory(memory, FIRST_FRAMEBUFFER_START);
+impl Display for DisplayImplementation {
+    type Handle = raylib::RaylibHandle;
+    type Thread = raylib::RaylibThread;
+
+    fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self {
+        let mut texture = handle
+            .load_render_texture(thread, WIDTH as u32, HEIGHT as u32)
+            .unwrap();
+        let render_texture: &mut RenderTexture = texture.as_mut();
+        render_texture.texture.format =
+            raylib::ffi::PixelFormat::PIXELFORMAT_PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as _;
         Self {
-            visible_framebuffer: [FIRST_FRAMEBUFFER_START, SECOND_FRAMBUFFER_START]
-                .into_iter()
-                .cycle(),
-            texture: unsafe { raylib::ffi::LoadTextureFromImage(image_struct) },
+            first_framebuffer_visible: true,
+            texture,
         }
     }
 
-    fn render(&self, memory: &mut Memory) {
+    fn render(&mut self, memory: &mut Memory, handle: &mut RaylibDrawHandle) {
         let tint_color = raylib::ffi::Color {
-            r: 255,
-            g: 255,
-            b: 255,
-            a: 255,
+            r: 0xFF,
+            g: 0xFF,
+            b: 0xFF,
+            a: 0xFF,
         };
         let scale = SCREEN_SIZE.height as f32 / HEIGHT as f32;
-        unsafe {
-            raylib::ffi::UpdateTexture(
-                self.texture,
-                memory
-                    .as_mut_pointer()
-                    .offset(FIRST_FRAMEBUFFER_START as isize),
-            );
-            raylib::ffi::DrawTextureEx(
-                self.texture,
-                raylib::ffi::Vector2 { x: 0.0, y: 0.0 },
-                0.0,
-                scale,
-                tint_color,
-            );
-        }
+        self.texture.update_texture(
+            &memory.data()[address_constants::FIRST_FRAMEBUFFER_START as usize..]
+                [..address_constants::FRAMEBUFFER_SIZE],
+        );
+        handle.draw_texture_ex(
+            &self.texture,
+            raylib::ffi::Vector2 { x: 0.0, y: 0.0 },
+            0.0,
+            scale,
+            tint_color,
+        );
     }
-}
 
-impl Drop for Display {
-    fn drop(&mut self) {
-        unsafe {
-            raylib::ffi::UnloadTexture(self.texture);
-        }
+    fn swap(&mut self) {
+        self.first_framebuffer_visible = !self.first_framebuffer_visible;
+    }
+
+    fn is_first_framebuffer_visible(&self) -> bool {
+        self.first_framebuffer_visible
     }
 }

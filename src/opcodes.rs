@@ -313,6 +313,8 @@ opcodes!(
     { PushRegister, 0x0015, registers(R register); cycles = 1, Increment::Yes, "push the value of register RR onto the stack" },
     { PopRegister, 0x0016, registers(R register); cycles = 1, Increment::Yes, "pop from the stack and store the value in register RR" },
     { CallAddress, 0x0017, registers(), address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
+    { CallRegister, 0x0036, registers(R register); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in register R" },
+    { CallPointer, 0x0037, registers(P pointer); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in memory at the location specified by the value in register P" },
     { Return, 0x0018, registers(); cycles = 1, Increment::No, "pop the return address from the stack and jump to it" },
 
     // unconditional jumps
@@ -353,4 +355,8 @@ opcodes!(
 
     // Timing
     { PollTime, 0x0033, registers(H high, L low); cycles = 1, Increment::Yes, "store the number of milliseconds since the UNIX epoch into registers high and low" },
+
+    // Rendering
+    { SwapFramebuffers, 0x0035, registers(); cycles = 1, Increment::Yes, "swap the display buffers" },
+    { InvisibleFramebufferAddress, 0x0038, registers(T target); cycles = 1, Increment::Yes, "get the start address of the framebuffer that's currently invisible (use the address to draw without tearing)" },
 );

@@ -1,6 +1,7 @@
-use crate::{keyboard::Keyboard, timer::Timer};
+use crate::{display, keyboard::Keyboard, timer::Timer};
 
-pub struct Periphery {
+pub struct Periphery<Display: display::Display> {
     pub timer: Timer,
     pub keyboard: Keyboard,
+    pub display: Display,
 }

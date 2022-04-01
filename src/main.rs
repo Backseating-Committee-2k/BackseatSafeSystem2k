@@ -21,7 +21,7 @@ use std::{
 };
 
 use clap::StructOpt;
-use display::Display;
+use display::{Display, DisplayImplementation, MockDisplay};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use num_format::{CustomFormat, ToFormattedString};
@@ -154,6 +154,7 @@ fn reverse(
     let periphery = Periphery {
         timer: Timer::new(ms_since_epoch),
         keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
+        display: MockDisplay::new(&mut (), &mut ()),
     };
     let mut machine = Machine::new(periphery);
     let num_instructions = match input_filename {
@@ -180,7 +181,7 @@ fn reverse(
     Ok(())
 }
 
-fn load_from_stdin(machine: &mut Machine<Display>) -> Result<usize, Box<dyn Error>> {
+fn load_from_stdin(machine: &mut Machine<impl display::Display>) -> Result<usize, Box<dyn Error>> {
     let instructions = read_machine_code_from_stdin()?;
     write_buffer_as_instructions(&instructions, machine)
 }
@@ -215,7 +216,7 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             ),
             (
                 "SECOND_FRAMEBUFFER_START",
-                address_constants::SECOND_FRAMBUFFER_START as _,
+                address_constants::SECOND_FRAMEBUFFER_START as _,
             ),
             ("FRAMEBUFFER_SIZE", address_constants::FRAMEBUFFER_SIZE as _),
             ("TERMINAL_WIDTH", terminal::WIDTH as _),
@@ -325,6 +326,7 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
                 false => KeyState::Up,
             }
         })),
+        display: DisplayImplementation::new(&mut raylib_handle.borrow_mut(), &raylib_thread),
     };
 
     let mut machine = Machine::new(periphery);
@@ -387,7 +389,7 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 }
 
 fn load_rom(
-    machine: &mut Machine<Display>,
+    machine: &mut Machine<impl display::Display>,
     filename: impl AsRef<Path>,
 ) -> Result<usize, Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
@@ -396,7 +398,7 @@ fn load_rom(
 
 fn write_buffer_as_instructions(
     buffer: &[u8],
-    machine: &mut Machine<Display>,
+    machine: &mut Machine<impl display::Display>,
 ) -> Result<usize, Box<dyn Error>> {
     if buffer.len() % Instruction::SIZE != 0 {
         return Err(format!("Filesize must be divisible by {}", Instruction::SIZE).into());
@@ -427,7 +429,7 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn execute_next_instruction(machine: &mut Machine<Display>) {
+fn execute_next_instruction(machine: &mut Machine<DisplayImplementation>) {
     if !machine.is_halted() {
         machine.execute_next_instruction();
     }
@@ -461,7 +463,7 @@ fn render_if_needed(
     time_measurements: &mut TimeMeasurements,
     raylib_handle: &mut RaylibHandle,
     thread: &RaylibThread,
-    machine: &mut Machine<Display>,
+    machine: &mut Machine<DisplayImplementation>,
     font: &Font,
     custom_number_format: &CustomFormat,
 ) {
@@ -486,7 +488,11 @@ fn render_if_needed(
     }
 }
 
-fn render(draw_handle: &mut RaylibDrawHandle, machine: &mut Machine<Display>, font: &Font) {
+fn render(
+    draw_handle: &mut RaylibDrawHandle,
+    machine: &mut Machine<DisplayImplementation>,
+    font: &Font,
+) {
     draw_handle.clear_background(Color::BLACK);
     machine.render(draw_handle, font);
     draw_handle.draw_fps(SCREEN_SIZE.width - 150, 10);

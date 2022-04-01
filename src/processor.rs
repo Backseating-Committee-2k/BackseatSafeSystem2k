@@ -2,11 +2,11 @@
 
 use std::ops::{Index, IndexMut};
 
-use crate::address_constants;
 use crate::keyboard::KeyState;
 use crate::opcodes::Opcode;
 use crate::periphery::Periphery;
 use crate::static_assert;
+use crate::{address_constants, display};
 use crate::{memory::Memory, Address, Instruction, Word};
 use crate::{Register, Size};
 use bitflags::bitflags;
@@ -167,7 +167,7 @@ impl Processor {
     pub fn execute_next_instruction(
         &mut self,
         memory: &mut Memory,
-        periphery: &mut Periphery,
+        periphery: &mut Periphery<impl display::Display>,
     ) -> ExecutionResult {
         use crate::processor::Opcode::*;
         let mut halted = false;
@@ -349,10 +349,7 @@ impl Processor {
                         self.registers[register] = self.stack_pop(memory);
                     }
                     CallAddress { address } => {
-                        self.stack_push(
-                            memory,
-                            self.get_instruction_pointer() + Instruction::SIZE as Address,
-                        );
+                        self.push_instruction_pointer(memory);
                         self.set_instruction_pointer(address);
                     }
                     Return {} => {
@@ -519,6 +516,18 @@ impl Processor {
                         self.set_flag(Flag::Zero, self.registers[target] == 0);
                         self.set_flag(Flag::Carry, overflow_happened);
                     }
+                    CallRegister { register } => {
+                        self.push_instruction_pointer(memory);
+                        self.set_instruction_pointer(self.registers[register]);
+                    }
+                    CallPointer { pointer } => {
+                        self.push_instruction_pointer(memory);
+                        self.set_instruction_pointer(memory.read_data(self.registers[pointer]));
+                    }
+                    SwapFramebuffers {} => periphery.display.swap(),
+                    InvisibleFramebufferAddress { target } => {
+                        self.registers[target] = periphery.display.invisible_framebuffer_address()
+                    }
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());
 
@@ -535,5 +544,12 @@ impl Processor {
             true => ExecutionResult::Halted,
             false => ExecutionResult::Normal,
         }
+    }
+
+    fn push_instruction_pointer(&mut self, memory: &mut Memory) {
+        self.stack_push(
+            memory,
+            self.get_instruction_pointer() + Instruction::SIZE as Address,
+        );
     }
 }

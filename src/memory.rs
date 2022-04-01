@@ -1,5 +1,3 @@
-use std::ffi::c_void;
-
 use crate::{opcodes::Opcode, Address, Instruction, Size, Word};
 
 pub struct Memory {
@@ -15,8 +13,8 @@ impl Memory {
         }
     }
 
-    pub fn as_mut_pointer(&mut self) -> *mut c_void {
-        self.data.as_mut_ptr() as *mut c_void
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 
     pub fn read_opcode(

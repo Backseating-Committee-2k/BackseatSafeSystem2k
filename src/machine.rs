@@ -1,31 +1,31 @@
-use crate::{
-    display::Render, memory::Memory, periphery::Periphery, processor::Processor, terminal,
-};
+use crate::{display, memory::Memory, periphery::Periphery, processor::Processor, terminal};
 use raylib::prelude::*;
 
-pub struct Machine<Display> {
+pub struct Machine<Display>
+where
+    Display: display::Display,
+{
     pub memory: Memory,
     pub processor: Processor,
-    pub display: Display,
-    pub periphery: Periphery,
+    pub periphery: Periphery<Display>,
     is_halted: bool,
 }
 
-impl<Display: Render> Machine<Display> {
-    pub fn new(periphery: Periphery) -> Self {
-        let mut memory = Memory::new();
-        let display = Display::new(&mut memory);
+impl<Display> Machine<Display>
+where
+    Display: display::Display,
+{
+    pub fn new(periphery: Periphery<Display>) -> Self {
         Self {
-            memory,
+            memory: Memory::new(),
             processor: Processor::new(),
-            display,
             periphery,
             is_halted: false,
         }
     }
 
     pub fn render(&mut self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
-        self.display.render(&mut self.memory);
+        self.periphery.display.render(&mut self.memory, draw_handle);
         terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
     }
 
@@ -47,7 +47,7 @@ impl<Display: Render> Machine<Display> {
 
 #[cfg(test)]
 mod tests {
-    use crate::display::MockDisplay;
+    use crate::display::{Display, MockDisplay};
     use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
     use crate::timer::Timer;
@@ -161,7 +161,7 @@ mod tests {
         machine
     }
 
-    fn create_mock_periphery() -> Periphery {
+    fn create_mock_periphery() -> Periphery<MockDisplay> {
         let mut time = 0;
         Periphery {
             timer: Timer::new(move || {
@@ -170,6 +170,7 @@ mod tests {
                 old_value
             }),
             keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
+            display: MockDisplay::new(&mut (), &()),
         }
     }
 
@@ -1704,4 +1705,47 @@ mod tests {
         ],
         registers_post = [(0.into(), 0), (1.into(), 1)],
     );
+
+    create_test!(
+        call_register,
+        opcodes = &[
+            Opcode::CallRegister{
+                register: 0.into(),
+            }
+        ],
+        registers_pre = [0xAB => 0],
+        registers_post = [(Processor::INSTRUCTION_POINTER, 0xAB)],
+    );
+
+    create_test!(
+        call_pointer,
+        opcodes = &[Opcode::CallPointer{ pointer: 0.into() }],
+        registers_pre = [42 * Word::SIZE as Word => 0],
+        memory_pre = [42 * Instruction::SIZE as Word => 42 * Word::SIZE as Address],
+        registers_post = [(Processor::INSTRUCTION_POINTER, 42 * Instruction::SIZE as Word)],
+    );
+
+    #[test]
+    fn swap_framebuffers() {
+        let mut machine = create_machine_with_opcodes(&[
+            Opcode::InvisibleFramebufferAddress { target: 0.into() },
+            Opcode::SwapFramebuffers {},
+            Opcode::InvisibleFramebufferAddress { target: 0.into() },
+        ]);
+        machine.execute_next_instruction();
+        assert_eq!(
+            machine.processor.registers[0.into()],
+            address_constants::SECOND_FRAMEBUFFER_START
+        );
+        machine.execute_next_instruction();
+        assert_eq!(
+            machine.processor.registers[0.into()],
+            address_constants::SECOND_FRAMEBUFFER_START
+        );
+        machine.execute_next_instruction();
+        assert_eq!(
+            machine.processor.registers[0.into()],
+            address_constants::FIRST_FRAMEBUFFER_START
+        );
+    }
 }

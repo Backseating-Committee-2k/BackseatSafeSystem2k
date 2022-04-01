@@ -75,12 +75,11 @@ impl<const SIZE: usize> IndexMut<Register> for Registers<SIZE> {
 
 pub struct Processor {
     pub registers: Registers<{ Self::NUM_REGISTERS }>,
+    cycle_count: u64,
 }
 
 impl Processor {
     pub const NUM_REGISTERS: usize = 256;
-    pub const CYCLE_COUNT_HIGH: Register = Register((Self::NUM_REGISTERS - 5) as _);
-    pub const CYCLE_COUNT_LOW: Register = Register((Self::NUM_REGISTERS - 4) as _);
     pub const FLAGS: Register = Register((Self::NUM_REGISTERS - 3) as _);
     pub const INSTRUCTION_POINTER: Register = Register((Self::NUM_REGISTERS - 2) as _);
     pub const STACK_POINTER: Register = Register((Self::NUM_REGISTERS - 1) as _);
@@ -88,6 +87,7 @@ impl Processor {
     pub fn new() -> Self {
         let mut result = Self {
             registers: Registers([0; Self::NUM_REGISTERS]),
+            cycle_count: 0,
         };
         result.registers[Self::INSTRUCTION_POINTER] = address_constants::ENTRY_POINT;
         result.registers[Self::STACK_POINTER] = address_constants::STACK_START;
@@ -157,14 +157,11 @@ impl Processor {
     }
 
     pub fn get_cycle_count(&self) -> u64 {
-        ((self.registers[Self::CYCLE_COUNT_HIGH] as u64) << Word::BITS)
-            | self.registers[Self::CYCLE_COUNT_LOW] as u64
+        self.cycle_count
     }
 
     pub fn increase_cycle_count(&mut self, amount: u64) {
-        let new_cycle_count = self.get_cycle_count() + amount;
-        self.registers[Self::CYCLE_COUNT_HIGH] = (new_cycle_count >> Word::BITS) as Word;
-        self.registers[Self::CYCLE_COUNT_LOW] = new_cycle_count as Word;
+        self.cycle_count += amount;
     }
 
     pub fn execute_next_instruction(

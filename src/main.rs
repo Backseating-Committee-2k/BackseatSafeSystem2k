@@ -204,8 +204,6 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
         constants: HashMap::from([
             ("ENTRY_POINT", address_constants::ENTRY_POINT as _),
             ("NUM_REGISTERS", Processor::NUM_REGISTERS as _),
-            ("CYCLE_COUNT_HIGH", Processor::CYCLE_COUNT_HIGH.0 as _),
-            ("CYCLE_COUNT_LOW", Processor::CYCLE_COUNT_LOW.0 as _),
             ("FLAGS", Processor::FLAGS.0 as _),
             ("INSTRUCTION_POINTER", Processor::INSTRUCTION_POINTER.0 as _),
             ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
@@ -245,7 +243,7 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 }
 
 fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
-    /*let opcodes = &[
+    let opcodes = &[
         Opcode::MoveRegisterImmediate {
             // starting color
             register: 0.into(),
@@ -254,7 +252,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
         Opcode::MoveRegisterImmediate {
             // num iterations
             register: 42.into(),
-            immediate: 129600,
+            immediate: (display::WIDTH * display::HEIGHT) as Word,
         },
         // outer loop start
         Opcode::MoveRegisterImmediate {
@@ -266,7 +264,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             // current color
             target: 0.into(),
             source: 0.into(),
-            immediate: 0x100,
+            immediate: 0x200,
         },
         Opcode::MoveRegisterImmediate {
             register: 2.into(),
@@ -299,8 +297,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
         Opcode::JumpAddress {
             address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
         },
-    ];*/
-    let opcodes = &[Opcode::HaltAndCatchFire {}];
+    ];
     let machine_code = opcodes_to_machine_code(opcodes);
     match output_filename {
         Some(filename) => save_opcodes_as_machine_code(opcodes, filename)?,

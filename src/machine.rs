@@ -1772,4 +1772,16 @@ mod tests {
         ],
         registers_post = [(0.into(), 0), (1.into(), 1)],
     );
+
+    create_test!(
+        poll_cycle_count_03,
+        opcodes = &[
+            Opcode::PollCycleCountHighLow {
+                high: 0.into(),
+                low: 1.into()
+            }
+        ],
+        registers_pre = [15 => 0, 15 => 1],
+        registers_post = [(0.into(), 0), (1.into(), 0)],
+    );
 }

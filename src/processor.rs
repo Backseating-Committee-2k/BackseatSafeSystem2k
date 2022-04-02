@@ -5,8 +5,8 @@ use std::ops::{Index, IndexMut};
 use crate::keyboard::KeyState;
 use crate::opcodes::Opcode;
 use crate::periphery::Periphery;
-use crate::static_assert;
 use crate::{address_constants, display};
+use crate::{dumper, static_assert};
 use crate::{memory::Memory, Address, Instruction, Word};
 use crate::{Register, Size};
 use bitflags::bitflags;
@@ -532,8 +532,22 @@ impl Processor {
                         self.registers[low] = self.cycle_count as Word;
                         self.registers[high] = (self.cycle_count >> Word::BITS) as Word;
                     }
-                    DumpRegisters {} => todo!(),
-                    DumpMemory {} => todo!(),
+                    DumpRegisters {} => {
+                        let data: Vec<_> = self
+                            .registers
+                            .0
+                            .iter()
+                            .flat_map(|word| word.to_be_bytes())
+                            .collect();
+                        if let Err(error) = dumper::dump("registers", &data) {
+                            eprintln!("Error dumping registers: {}", error);
+                        }
+                    }
+                    DumpMemory {} => {
+                        if let Err(error) = dumper::dump("memory", memory.data()) {
+                            eprintln!("Error dumping memory: {}", error);
+                        }
+                    }
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());
 

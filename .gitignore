@@ -4,3 +4,4 @@ roms/*
 !roms/counter.backseat
 !roms/game_of_life.backseat
 !roms/hello_world.backseat
+dumps/*

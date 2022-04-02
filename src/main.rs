@@ -1,5 +1,6 @@
 mod address_constants;
 mod display;
+mod dumper;
 mod keyboard;
 mod machine;
 mod memory;

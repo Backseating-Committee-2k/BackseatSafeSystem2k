@@ -154,7 +154,7 @@ fn reverse(
     let periphery = Periphery {
         timer: Timer::new(ms_since_epoch),
         keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
-        display: MockDisplay::new(&mut (), &mut ()),
+        display: MockDisplay::new(&mut (), &()),
     };
     let mut machine = Machine::new(periphery);
     let num_instructions = match input_filename {

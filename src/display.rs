@@ -4,11 +4,7 @@ use raylib::{
     texture::{RaylibTexture2D, RenderTexture2D},
 };
 
-use crate::{
-    address_constants::{self, FIRST_FRAMEBUFFER_START, SECOND_FRAMEBUFFER_START},
-    memory::Memory,
-    Address, SCREEN_SIZE,
-};
+use crate::{address_constants, memory::Memory, Address, SCREEN_SIZE};
 
 pub const WIDTH: usize = 480;
 pub const HEIGHT: usize = WIDTH / 4 * 3;
@@ -52,7 +48,7 @@ impl Display for MockDisplay {
         self.first_framebuffer_visible
     }
 
-    fn render(&mut self, memory: &mut Memory, _: &mut RaylibDrawHandle) {
+    fn render(&mut self, _: &mut Memory, _: &mut RaylibDrawHandle) {
         // do nothing
     }
 }
@@ -60,23 +56,6 @@ impl Display for MockDisplay {
 pub struct DisplayImplementation {
     first_framebuffer_visible: bool,
     texture: RenderTexture2D,
-}
-
-impl DisplayImplementation {
-    fn first_framebuffer_visible_to_address(first_framebuffer_visible: bool) -> Address {
-        match first_framebuffer_visible {
-            true => FIRST_FRAMEBUFFER_START,
-            false => SECOND_FRAMEBUFFER_START,
-        }
-    }
-
-    fn visible_framebuffer(&self) -> Address {
-        Self::first_framebuffer_visible_to_address(self.first_framebuffer_visible)
-    }
-
-    fn invisible_framebuffer(&self) -> Address {
-        Self::first_framebuffer_visible_to_address(!self.first_framebuffer_visible)
-    }
 }
 
 impl Display for DisplayImplementation {

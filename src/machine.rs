@@ -1748,4 +1748,28 @@ mod tests {
             address_constants::FIRST_FRAMEBUFFER_START
         );
     }
+
+    create_test!(
+        poll_cycle_count,
+        opcodes = &[Opcode::PollCycleCountHighLow {
+            high: 0.into(),
+            low: 1.into()
+        },],
+        registers_post = [(0.into(), 0), (1.into(), 0)],
+    );
+
+    create_test!(
+        poll_cycle_count_02,
+        opcodes = &[
+            Opcode::MoveRegisterImmediate {
+                register: 7.into(),
+                immediate: 42,
+            },
+            Opcode::PollCycleCountHighLow {
+                high: 0.into(),
+                low: 1.into()
+            },
+        ],
+        registers_post = [(0.into(), 0), (1.into(), 1)],
+    );
 }

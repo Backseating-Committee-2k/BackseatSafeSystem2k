@@ -528,6 +528,12 @@ impl Processor {
                     InvisibleFramebufferAddress { target } => {
                         self.registers[target] = periphery.display.invisible_framebuffer_address()
                     }
+                    PollCycleCountHighLow { high, low } => {
+                        self.registers[low] = self.cycle_count as Word;
+                        self.registers[high] = (self.cycle_count >> Word::BITS) as Word;
+                    }
+                    DumpRegisters {} => todo!(),
+                    DumpMemory {} => todo!(),
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());
 

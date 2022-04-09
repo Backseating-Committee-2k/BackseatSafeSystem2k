@@ -167,10 +167,10 @@ macro_rules! opcodes {
         }
 
         /// ## Opcodes
-        /// | Opcode                | Meaning                                   |
-        /// |-----------------------|-------------------------------------------|
+        /// | Opcode                | Name | Meaning                                   |
+        /// |-----------------------|------|-------------------------------------------|
         $(
-            #[doc = concat!(" | `", stringify!($code), "\u{00a0}", stringify_registers!(($( $register_letter ),*) $(, $type)?), "` | ", $comment, " |")]
+            #[doc = concat!(" | `", stringify!($code), "\u{00a0}", stringify_registers!(($( $register_letter ),*) $(, $type)?), "` | ", stringify!($identifier), " | ", $comment, " |")]
         )+
 
         #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

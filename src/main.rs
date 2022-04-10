@@ -112,7 +112,7 @@ enum Action {
         /// Output path of the machine code to be written
         path: Option<PathBuf>,
     },
-    /// Write the available opcodes and other information such as constants in JSON format    
+    /// Write the available opcodes and other information such as constants in JSON format
     Json {
         /// Output path of the JSON file to be written
         path: Option<PathBuf>,
@@ -294,10 +294,10 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
         },
         Opcode::JumpAddressIfLessThan {
             comparison: 10.into(),
-            address: address_constants::ENTRY_POINT + 5 * Instruction::SIZE as Word,
+            target_address: address_constants::ENTRY_POINT + 5 * Instruction::SIZE as Word,
         },
         Opcode::JumpAddress {
-            address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
+            target_address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
         },
     ];
     let machine_code = opcodes_to_machine_code(opcodes);

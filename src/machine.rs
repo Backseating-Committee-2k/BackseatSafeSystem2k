@@ -206,7 +206,7 @@ mod tests {
             let data = 0xABCD_1234;
             let register = 0x0A.into();
         },
-        opcodes = &[MoveRegisterAddress { register, address }],
+        opcodes = &[MoveRegisterAddress { register, source_address: address }],
         memory_pre = [data => address],
         registers_post = [(register, data)],
     );
@@ -230,7 +230,7 @@ mod tests {
             let data = 0xC0FFEE;
             let address = 0xF0;
         },
-        opcodes = &[MoveAddressRegister { address, register }],
+        opcodes = &[MoveAddressRegister { target_address: address, register }],
         registers_pre = [data => register],
         memory_post = [(address, data)],
     );
@@ -1221,7 +1221,7 @@ mod tests {
         machine.memory.write_opcode(
             address_constants::ENTRY_POINT,
             Opcode::CallAddress {
-                address: call_address,
+                target_address: call_address,
             },
         );
         let target_register = Register(0xAB);
@@ -1267,7 +1267,9 @@ mod tests {
         setup = {
             let address = address_constants::ENTRY_POINT as Address + 42;
         },
-        opcodes = &[Opcode::JumpAddress { address }],
+        opcodes = &[Opcode::JumpAddress {
+            target_address: address
+        }],
         registers_post = [(Processor::INSTRUCTION_POINTER, address)],
     );
 
@@ -1307,7 +1309,7 @@ mod tests {
                     },
                     Opcode::$jump_address_instruction {
                         comparison: target_register,
-                        address: target_address,
+                        target_address,
                     },
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
@@ -1506,7 +1508,7 @@ mod tests {
                         rhs: 2.into(),
                     },
                     Opcode::$jump_instruction {
-                        address: target_address,
+                        target_address,
                     },
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
@@ -1604,7 +1606,7 @@ mod tests {
                         rhs: 2.into(),
                     },
                     Opcode::$jump_instruction {
-                        address: target_address,
+                        target_address,
                     },
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],

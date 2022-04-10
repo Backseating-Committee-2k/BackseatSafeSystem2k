@@ -6,7 +6,10 @@ macro_rules! type_to_abbreviation {
     (immediate) => {
         "cccc\u{00a0}cccc"
     };
-    (address) => {
+    (source_address) => {
+        "aaaa\u{00a0}aaaa"
+    };
+    (target_address) => {
         "aaaa\u{00a0}aaaa"
     };
 }
@@ -119,7 +122,10 @@ macro_rules! type_to_datatype {
     (immediate) => {
         Word
     };
-    (address) => {
+    (source_address) => {
+        Address
+    };
+    (target_address) => {
         Address
     };
 }
@@ -182,9 +188,16 @@ macro_rules! opcodes {
         }
 
         #[derive(Serialize)]
+        pub enum Argument {
+            Register(&'static str, &'static str),
+            Address,
+            Immediate,
+        }
+
+        #[derive(Serialize)]
         pub struct OpcodeDescription {
             opcode: u16,
-            registers: Vec<(&'static str, &'static str)>,
+            arguments: Vec<Argument>,
             opcode_type: Option<&'static str>,
             cycles: usize,
             should_increment: bool,
@@ -195,18 +208,45 @@ macro_rules! opcodes {
             pub fn as_hashmap() -> HashMap<&'static str, OpcodeDescription> {
                 let mut result = HashMap::new();
                 $(
-                    result.insert(stringify!($identifier), OpcodeDescription{
-                        opcode: $code,
-                        registers: vec![
-                            $(
-                                (stringify!($register_letter), stringify!($register_name)),
-                            )*
-                        ],
-                        opcode_type: type_to_opcode_type!($($type)?),
-                        cycles: $num_cycles,
-                        should_increment: matches!(Increment::$should_increment, Increment::Yes),
-                        docstring: $comment,
-                    });
+                    {
+                        #[allow(unused_mut)]
+                        let mut arguments = Vec::<Argument>::new();
+
+                        macro_rules! push_target {
+                            () => {};
+                            (target_address) => {
+                                arguments.push(Argument::Address);
+                            };
+                            (source_address) => {};
+                            (immediate) => {};
+                        }
+                        push_target!($($type)?);
+
+                        $(
+                            arguments.push(Argument::Register(stringify!($register_letter), stringify!($register_name)));
+                        )*
+
+                        macro_rules! push_source {
+                            () => {};
+                            (source_address) => {
+                                arguments.push(Argument::Address);
+                            };
+                            (immediate) => {
+                                arguments.push(Argument::Immediate);
+                            };
+                            (target_address) => {};
+                        }
+                        push_source!($($type)?);
+
+                        result.insert(stringify!($identifier), OpcodeDescription{
+                            opcode: $code,
+                            arguments,
+                            opcode_type: type_to_opcode_type!($($type)?),
+                            cycles: $num_cycles,
+                            should_increment: matches!(Increment::$should_increment, Increment::Yes),
+                            docstring: $comment,
+                        });
+                    }
                 )+
                 result
             }
@@ -251,7 +291,8 @@ macro_rules! opcodes {
                 let address = immediate;
                 macro_rules! address_or_immediate {
                     ( immediate ) => { immediate };
-                    ( address ) => { address };
+                    ( source_address ) => { address };
+                    ( target_address ) => { address };
                 }
                 #[deny(unreachable_patterns)]
                 match opcode {
@@ -279,9 +320,9 @@ macro_rules! opcodes {
 opcodes!(
     // move instructions
     { MoveRegisterImmediate, 0x0000, registers(R register), immediate; cycles = 1, Increment::Yes, "move the value C into register R" },
-    { MoveRegisterAddress, 0x0001, registers(R register), address; cycles = 1, Increment::Yes, "move the value at address A into register R" },
+    { MoveRegisterAddress, 0x0001, registers(R register), source_address; cycles = 1, Increment::Yes, "move the value at address A into register R" },
     { MoveTargetSource, 0x0002, registers(T target, S source); cycles = 1, Increment::Yes, "move the contents of register S into register T" },
-    { MoveAddressRegister, 0x0003, registers(R register), address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A" },
+    { MoveAddressRegister, 0x0003, registers(R register), target_address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A" },
     { MoveTargetPointer, 0x0004, registers(T target, P pointer); cycles = 1, Increment::Yes, "move the contents addressed by the value of register P into register T" },
     { MovePointerSource, 0x0005, registers(P pointer, S source); cycles = 1, Increment::Yes, "move the contents of register S into memory at address specified by register P" },
 
@@ -312,27 +353,27 @@ opcodes!(
     // stack instructions
     { PushRegister, 0x0015, registers(R register); cycles = 1, Increment::Yes, "push the value of register RR onto the stack" },
     { PopRegister, 0x0016, registers(R register); cycles = 1, Increment::Yes, "pop from the stack and store the value in register RR" },
-    { CallAddress, 0x0017, registers(), address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
+    { CallAddress, 0x0017, registers(), target_address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
     { CallRegister, 0x0036, registers(R register); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in register R" },
     { CallPointer, 0x0037, registers(P pointer); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in memory at the location specified by the value in register P" },
     { Return, 0x0018, registers(); cycles = 1, Increment::No, "pop the return address from the stack and jump to it" },
 
     // unconditional jumps
-    { JumpAddress, 0x0019, registers(), address; cycles = 1, Increment::No, "jump to the given address" },
+    { JumpAddress, 0x0019, registers(), target_address; cycles = 1, Increment::No, "jump to the given address" },
     { JumpRegister, 0x001A, registers(R register); cycles = 1, Increment::No, "jump to the address stored in register R" },
 
     // conditional jumps, address given as immediate
-    { JumpAddressIfEqual, 0x001B, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"equality\"" },
-    { JumpAddressIfGreaterThan, 0x001C, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\"" },
-    { JumpAddressIfLessThan, 0x001D, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\"" },
-    { JumpAddressIfGreaterThanOrEqual, 0x001E, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
-    { JumpAddressIfLessThanOrEqual, 0x001F, registers(C comparison), address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
-    { JumpAddressIfZero, 0x0020, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is set" },
-    { JumpAddressIfNotZero, 0x0021, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is not set" },
-    { JumpAddressIfCarry, 0x0022, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is set" },
-    { JumpAddressIfNotCarry, 0x0023, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is not set" },
-    { JumpAddressIfDivideByZero, 0x0024, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is set" },
-    { JumpAddressIfNotDivideByZero, 0x0025, registers(), address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is not set" },
+    { JumpAddressIfEqual, 0x001B, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"equality\"" },
+    { JumpAddressIfGreaterThan, 0x001C, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\"" },
+    { JumpAddressIfLessThan, 0x001D, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\"" },
+    { JumpAddressIfGreaterThanOrEqual, 0x001E, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
+    { JumpAddressIfLessThanOrEqual, 0x001F, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
+    { JumpAddressIfZero, 0x0020, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is set" },
+    { JumpAddressIfNotZero, 0x0021, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is not set" },
+    { JumpAddressIfCarry, 0x0022, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is set" },
+    { JumpAddressIfNotCarry, 0x0023, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is not set" },
+    { JumpAddressIfDivideByZero, 0x0024, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is set" },
+    { JumpAddressIfNotDivideByZero, 0x0025, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is not set" },
 
     // conditional jumps, address given as register
     { JumpRegisterIfEqual, 0x0026, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"equality\"" },

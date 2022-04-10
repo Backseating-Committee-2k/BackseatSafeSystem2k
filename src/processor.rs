@@ -178,15 +178,17 @@ impl Processor {
                         register,
                         immediate,
                     } => self.registers[register] = immediate,
-                    MoveRegisterAddress { register, address } => {
-                        self.registers[register] = memory.read_data(address)
-                    }
+                    MoveRegisterAddress {
+                        register,
+                        source_address: address,
+                    } => self.registers[register] = memory.read_data(address),
                     MoveTargetSource { target, source } => {
                         self.registers[target] = self.registers[source]
                     }
-                    MoveAddressRegister { register, address } => {
-                        memory.write_data(address, self.registers[register])
-                    }
+                    MoveAddressRegister {
+                        register,
+                        target_address: address,
+                    } => memory.write_data(address, self.registers[register]),
                     MoveTargetPointer { target, pointer } => {
                         self.registers[target] = memory.read_data(self.registers[pointer])
                     }
@@ -348,7 +350,9 @@ impl Processor {
                     PopRegister { register } => {
                         self.registers[register] = self.stack_pop(memory);
                     }
-                    CallAddress { address } => {
+                    CallAddress {
+                        target_address: address,
+                    } => {
                         self.push_instruction_pointer(memory);
                         self.set_instruction_pointer(address);
                     }
@@ -356,7 +360,9 @@ impl Processor {
                         let return_address = self.stack_pop(memory);
                         self.set_instruction_pointer(return_address);
                     }
-                    JumpAddress { address } => {
+                    JumpAddress {
+                        target_address: address,
+                    } => {
                         self.set_instruction_pointer(address);
                     }
                     JumpRegister { register } => {
@@ -364,67 +370,75 @@ impl Processor {
                     }
                     JumpAddressIfEqual {
                         comparison,
-                        address,
+                        target_address: address,
                     } => match self.registers[comparison] {
                         0 => self.set_instruction_pointer(address),
                         _ => self.advance_instruction_pointer(Direction::Forwards),
                     },
                     JumpAddressIfGreaterThan {
                         comparison,
-                        address,
+                        target_address: address,
                     } => match self.registers[comparison] {
                         1 => self.set_instruction_pointer(address),
                         _ => self.advance_instruction_pointer(Direction::Forwards),
                     },
                     JumpAddressIfLessThan {
                         comparison,
-                        address,
+                        target_address: address,
                     } => match self.registers[comparison] {
                         Word::MAX => self.set_instruction_pointer(address),
                         _ => self.advance_instruction_pointer(Direction::Forwards),
                     },
                     JumpAddressIfGreaterThanOrEqual {
                         comparison,
-                        address,
+                        target_address: address,
                     } => match self.registers[comparison] {
                         1 | 0 => self.set_instruction_pointer(address),
                         _ => self.advance_instruction_pointer(Direction::Forwards),
                     },
                     JumpAddressIfLessThanOrEqual {
                         comparison,
-                        address,
+                        target_address: address,
                     } => match self.registers[comparison] {
                         Word::MAX | 0 => self.set_instruction_pointer(address),
                         _ => self.advance_instruction_pointer(Direction::Forwards),
                     },
-                    JumpAddressIfZero { address } => match self.get_flag(Flag::Zero) {
+                    JumpAddressIfZero {
+                        target_address: address,
+                    } => match self.get_flag(Flag::Zero) {
                         true => self.set_instruction_pointer(address),
                         false => self.advance_instruction_pointer(Direction::Forwards),
                     },
-                    JumpAddressIfNotZero { address } => match self.get_flag(Flag::Zero) {
+                    JumpAddressIfNotZero {
+                        target_address: address,
+                    } => match self.get_flag(Flag::Zero) {
                         false => self.set_instruction_pointer(address),
                         true => self.advance_instruction_pointer(Direction::Forwards),
                     },
-                    JumpAddressIfCarry { address } => match self.get_flag(Flag::Carry) {
+                    JumpAddressIfCarry {
+                        target_address: address,
+                    } => match self.get_flag(Flag::Carry) {
                         true => self.set_instruction_pointer(address),
                         false => self.advance_instruction_pointer(Direction::Forwards),
                     },
-                    JumpAddressIfNotCarry { address } => match self.get_flag(Flag::Carry) {
+                    JumpAddressIfNotCarry {
+                        target_address: address,
+                    } => match self.get_flag(Flag::Carry) {
                         false => self.set_instruction_pointer(address),
                         true => self.advance_instruction_pointer(Direction::Forwards),
                     },
-                    JumpAddressIfDivideByZero { address } => {
-                        match self.get_flag(Flag::DivideByZero) {
-                            true => self.set_instruction_pointer(address),
-                            false => self.advance_instruction_pointer(Direction::Forwards),
-                        }
-                    }
-                    JumpAddressIfNotDivideByZero { address } => {
-                        match self.get_flag(Flag::DivideByZero) {
-                            false => self.set_instruction_pointer(address),
-                            true => self.advance_instruction_pointer(Direction::Forwards),
-                        }
-                    }
+                    JumpAddressIfDivideByZero {
+                        target_address: address,
+                    } => match self.get_flag(Flag::DivideByZero) {
+                        true => self.set_instruction_pointer(address),
+                        false => self.advance_instruction_pointer(Direction::Forwards),
+                    },
+                    JumpAddressIfNotDivideByZero {
+                        target_address: address,
+                    } => match self.get_flag(Flag::DivideByZero) {
+                        false => self.set_instruction_pointer(address),
+                        true => self.advance_instruction_pointer(Direction::Forwards),
+                    },
                     JumpRegisterIfEqual {
                         pointer,
                         comparison,

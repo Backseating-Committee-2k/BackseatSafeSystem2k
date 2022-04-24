@@ -359,21 +359,21 @@ opcodes!(
     { Return, 0x0018, registers(); cycles = 1, Increment::No, "pop the return address from the stack and jump to it" },
 
     // unconditional jumps
-    { JumpAddress, 0x0019, registers(), target_address; cycles = 1, Increment::No, "jump to the given address" },
+    { JumpImmediate, 0x0019, registers(), immediate; cycles = 1, Increment::No, "jump to the given address" },
     { JumpRegister, 0x001A, registers(R register); cycles = 1, Increment::No, "jump to the address stored in register R" },
 
     // conditional jumps, address given as immediate
-    { JumpAddressIfEqual, 0x001B, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"equality\"" },
-    { JumpAddressIfGreaterThan, 0x001C, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\"" },
-    { JumpAddressIfLessThan, 0x001D, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\"" },
-    { JumpAddressIfGreaterThanOrEqual, 0x001E, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
-    { JumpAddressIfLessThanOrEqual, 0x001F, registers(C comparison), target_address; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
-    { JumpAddressIfZero, 0x0020, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is set" },
-    { JumpAddressIfNotZero, 0x0021, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the zero flag is not set" },
-    { JumpAddressIfCarry, 0x0022, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is set" },
-    { JumpAddressIfNotCarry, 0x0023, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the carry flag is not set" },
-    { JumpAddressIfDivideByZero, 0x0024, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is set" },
-    { JumpAddressIfNotDivideByZero, 0x0025, registers(), target_address; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is not set" },
+    { JumpImmediateIfEqual, 0x001B, registers(C comparison), immediate; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"equality\"" },
+    { JumpImmediateIfGreaterThan, 0x001C, registers(C comparison), immediate; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\"" },
+    { JumpImmediateIfLessThan, 0x001D, registers(C comparison), immediate; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\"" },
+    { JumpImmediateIfGreaterThanOrEqual, 0x001E, registers(C comparison), immediate; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"greater than\" or \"equal\"" },
+    { JumpImmediateIfLessThanOrEqual, 0x001F, registers(C comparison), immediate; cycles = 1, Increment::No, "jump to the specified address if the comparison result in register C corresponds to \"less than\" or \"equal\"" },
+    { JumpImmediateIfZero, 0x0020, registers(), immediate; cycles = 1, Increment::No, "jump to the specified address if the zero flag is set" },
+    { JumpImmediateIfNotZero, 0x0021, registers(), immediate; cycles = 1, Increment::No, "jump to the specified address if the zero flag is not set" },
+    { JumpImmediateIfCarry, 0x0022, registers(), immediate; cycles = 1, Increment::No, "jump to the specified address if the carry flag is set" },
+    { JumpImmediateIfNotCarry, 0x0023, registers(), immediate; cycles = 1, Increment::No, "jump to the specified address if the carry flag is not set" },
+    { JumpImmediateIfDivideByZero, 0x0024, registers(), immediate; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is set" },
+    { JumpImmediateIfNotDivideByZero, 0x0025, registers(), immediate; cycles = 1, Increment::No, "jump to the specified address if the divide by zero flag is not set" },
 
     // conditional jumps, address given as register
     { JumpRegisterIfEqual, 0x0026, registers(P pointer, C comparison); cycles = 1, Increment::No, "jump to the address specified in register P if the comparison result in register C corresponds to \"equality\"" },

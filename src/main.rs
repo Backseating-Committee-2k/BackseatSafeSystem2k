@@ -292,12 +292,12 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             lhs: 1.into(),
             rhs: 42.into(),
         },
-        Opcode::JumpAddressIfLessThan {
+        Opcode::JumpImmediateIfLessThan {
             comparison: 10.into(),
-            target_address: address_constants::ENTRY_POINT + 5 * Instruction::SIZE as Word,
+            immediate: address_constants::ENTRY_POINT + 5 * Instruction::SIZE as Word,
         },
-        Opcode::JumpAddress {
-            target_address: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
+        Opcode::JumpImmediate {
+            immediate: address_constants::ENTRY_POINT + 2 * Instruction::SIZE as Word,
         },
     ];
     let machine_code = opcodes_to_machine_code(opcodes);

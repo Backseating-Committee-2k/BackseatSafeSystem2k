@@ -1267,9 +1267,7 @@ mod tests {
         setup = {
             let address = address_constants::ENTRY_POINT as Address + 42;
         },
-        opcodes = &[Opcode::JumpAddress {
-            target_address: address
-        }],
+        opcodes = &[Opcode::JumpImmediate { immediate: address }],
         registers_post = [(Processor::INSTRUCTION_POINTER, address)],
     );
 
@@ -1309,7 +1307,7 @@ mod tests {
                     },
                     Opcode::$jump_address_instruction {
                         comparison: target_register,
-                        target_address,
+                        immediate: target_address,
                     },
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
@@ -1348,7 +1346,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_equal_that_jumps,
         jump_to_register_if_equal_that_jumps,
-        JumpAddressIfEqual,
+        JumpImmediateIfEqual,
         JumpRegisterIfEqual,
         42,
         42,
@@ -1358,7 +1356,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_equal_that_does_not_jump,
         jump_to_register_if_equal_that_does_not_jump,
-        JumpAddressIfEqual,
+        JumpImmediateIfEqual,
         JumpRegisterIfEqual,
         42,
         43,
@@ -1368,7 +1366,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_greater_than_that_jumps,
         jump_to_register_if_greater_than_that_jumps,
-        JumpAddressIfGreaterThan,
+        JumpImmediateIfGreaterThan,
         JumpRegisterIfGreaterThan,
         43,
         42,
@@ -1378,7 +1376,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_greater_than_that_does_not_jump_01,
         jump_to_register_if_greater_than_that_does_not_jump_01,
-        JumpAddressIfGreaterThan,
+        JumpImmediateIfGreaterThan,
         JumpRegisterIfGreaterThan,
         42,
         43,
@@ -1388,7 +1386,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_greater_than_that_does_not_jump_02,
         jump_to_register_if_greater_than_that_does_not_jump_02,
-        JumpAddressIfGreaterThan,
+        JumpImmediateIfGreaterThan,
         JumpRegisterIfGreaterThan,
         42,
         42,
@@ -1398,7 +1396,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_less_than_that_jumps,
         jump_to_register_if_less_than_that_jumps,
-        JumpAddressIfLessThan,
+        JumpImmediateIfLessThan,
         JumpRegisterIfLessThan,
         41,
         42,
@@ -1408,7 +1406,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_less_than_that_does_not_jump_01,
         jump_to_register_if_less_than_that_does_not_jump_01,
-        JumpAddressIfLessThan,
+        JumpImmediateIfLessThan,
         JumpRegisterIfLessThan,
         43,
         42,
@@ -1418,7 +1416,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_less_than_that_does_not_jump_02,
         jump_to_register_if_less_than_that_does_not_jump_02,
-        JumpAddressIfLessThan,
+        JumpImmediateIfLessThan,
         JumpRegisterIfLessThan,
         42,
         42,
@@ -1428,7 +1426,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_less_than_or_equal_that_jumps_01,
         jump_to_register_if_less_than_or_equal_that_jumps_01,
-        JumpAddressIfLessThanOrEqual,
+        JumpImmediateIfLessThanOrEqual,
         JumpRegisterIfLessThanOrEqual,
         41,
         42,
@@ -1438,7 +1436,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_less_than_or_equal_that_jumps_02,
         jump_to_register_if_less_than_or_equal_that_jumps_02,
-        JumpAddressIfLessThanOrEqual,
+        JumpImmediateIfLessThanOrEqual,
         JumpRegisterIfLessThanOrEqual,
         42,
         42,
@@ -1448,7 +1446,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_less_than_or_equal_that_does_not_jump,
         jump_to_register_if_less_than_or_equal_that_does_not_jump,
-        JumpAddressIfLessThanOrEqual,
+        JumpImmediateIfLessThanOrEqual,
         JumpRegisterIfLessThanOrEqual,
         43,
         42,
@@ -1458,7 +1456,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_greater_than_or_equal_that_jumps_01,
         jump_to_register_if_greater_than_or_equal_that_jumps_01,
-        JumpAddressIfGreaterThanOrEqual,
+        JumpImmediateIfGreaterThanOrEqual,
         JumpRegisterIfGreaterThanOrEqual,
         43,
         42,
@@ -1468,7 +1466,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_greater_than_or_equal_that_jumps_02,
         jump_to_register_if_greater_than_or_equal_that_jumps_02,
-        JumpAddressIfGreaterThanOrEqual,
+        JumpImmediateIfGreaterThanOrEqual,
         JumpRegisterIfGreaterThanOrEqual,
         42,
         42,
@@ -1478,7 +1476,7 @@ mod tests {
     create_jump_tests!(
         jump_to_address_if_greater_than_or_equal_that_does_not_jump,
         jump_to_register_if_greater_than_or_equal_that_does_not_jump,
-        JumpAddressIfGreaterThanOrEqual,
+        JumpImmediateIfGreaterThanOrEqual,
         JumpRegisterIfGreaterThanOrEqual,
         41,
         42,
@@ -1508,7 +1506,7 @@ mod tests {
                         rhs: 2.into(),
                     },
                     Opcode::$jump_instruction {
-                        target_address,
+                        immediate: target_address,
                     },
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
@@ -1521,7 +1519,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_zero_flag_set_that_jumps,
-        JumpAddressIfZero,
+        JumpImmediateIfZero,
         5,
         0,
         true
@@ -1529,7 +1527,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_zero_flag_set_that_does_not_jump,
-        JumpAddressIfZero,
+        JumpImmediateIfZero,
         5,
         2,
         false
@@ -1537,7 +1535,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_zero_flag_not_set_that_jumps,
-        JumpAddressIfNotZero,
+        JumpImmediateIfNotZero,
         5,
         3,
         true
@@ -1545,7 +1543,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_zero_flag_not_set_that_does_not_jump,
-        JumpAddressIfNotZero,
+        JumpImmediateIfNotZero,
         5,
         0,
         false
@@ -1553,7 +1551,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_carry_flag_set_that_jumps,
-        JumpAddressIfCarry,
+        JumpImmediateIfCarry,
         Word::MAX,
         2,
         true
@@ -1561,7 +1559,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_carry_flag_set_that_does_not_jump,
-        JumpAddressIfCarry,
+        JumpImmediateIfCarry,
         5,
         2,
         false
@@ -1569,7 +1567,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_carry_flag_not_set_that_jumps,
-        JumpAddressIfNotCarry,
+        JumpImmediateIfNotCarry,
         5,
         3,
         true
@@ -1577,7 +1575,7 @@ mod tests {
 
     create_jump_flag_test!(
         jump_to_address_if_carry_flag_not_set_that_does_not_jump,
-        JumpAddressIfNotCarry,
+        JumpImmediateIfNotCarry,
         2,
         Word::MAX,
         false
@@ -1606,7 +1604,7 @@ mod tests {
                         rhs: 2.into(),
                     },
                     Opcode::$jump_instruction {
-                        target_address,
+                        immediate: target_address,
                     },
                 ],
                 registers_pre = [$lhs => 1, $rhs => 2],
@@ -1619,7 +1617,7 @@ mod tests {
 
     create_jump_divmod_test!(
         jump_to_address_if_divide_by_zero_flag_set_that_jumps,
-        JumpAddressIfDivideByZero,
+        JumpImmediateIfDivideByZero,
         5,
         0,
         true
@@ -1627,7 +1625,7 @@ mod tests {
 
     create_jump_divmod_test!(
         jump_to_address_if_divide_by_zero_flag_set_that_does_not_jump,
-        JumpAddressIfDivideByZero,
+        JumpImmediateIfDivideByZero,
         5,
         2,
         false
@@ -1635,7 +1633,7 @@ mod tests {
 
     create_jump_divmod_test!(
         jump_to_address_if_divide_by_zero_flag_not_set_that_jumps,
-        JumpAddressIfNotDivideByZero,
+        JumpImmediateIfNotDivideByZero,
         5,
         3,
         true
@@ -1643,7 +1641,7 @@ mod tests {
 
     create_jump_divmod_test!(
         jump_to_address_if_divide_by_zero_flag_not_set_that_does_not_jump,
-        JumpAddressIfNotDivideByZero,
+        JumpImmediateIfNotDivideByZero,
         2,
         0,
         false

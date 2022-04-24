@@ -17,6 +17,10 @@ impl Memory {
         &self.data
     }
 
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        &mut self.data
+    }
+
     pub fn read_opcode(
         &self,
         address: Address,

@@ -14,17 +14,19 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     error::Error,
-    fmt::{Debug, Write},
+    fmt::Debug,
     io::{self, Read},
     path::{Path, PathBuf},
     rc::Rc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use address_constants::ENTRY_POINT;
 use clap::StructOpt;
-use display::{Display, DisplayImplementation, MockDisplay};
+use display::{Display, DisplayImplementation};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
+use memory::Memory;
 use num_format::{CustomFormat, ToFormattedString};
 use opcodes::Opcode;
 use periphery::Periphery;
@@ -117,15 +119,6 @@ enum Action {
         /// Output path of the JSON file to be written
         path: Option<PathBuf>,
     },
-    /// Read machine code (binary) and output a list of Instructions in Rust syntax
-    Reverse {
-        /// The path of the file to be written
-        #[clap(short, long)]
-        output_path: Option<PathBuf>,
-        /// The path of the input file containing machine code
-        #[clap(short, long)]
-        input_path: Option<PathBuf>,
-    },
 }
 
 /// The reference implementation of the backseat-safe-system-2k
@@ -141,50 +134,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         Action::Run { path } => run(path.as_deref()),
         Action::Emit { path } => emit(path.as_deref()),
         Action::Json { path } => print_json(path.as_deref()),
-        Action::Reverse {
-            output_path,
-            input_path,
-        } => reverse(output_path.as_deref(), input_path.as_deref()),
     }
 }
 
-fn reverse(
-    output_filename: Option<&Path>,
-    input_filename: Option<&Path>,
-) -> Result<(), Box<dyn Error>> {
-    let periphery = Periphery {
-        timer: Timer::new(ms_since_epoch),
-        keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
-        display: MockDisplay::new(&mut (), &()),
-    };
-    let mut machine = Machine::new(periphery);
-    let num_instructions = match input_filename {
-        Some(filename) => load_rom(&mut machine, filename)?,
-        None => load_from_stdin(&mut machine)?,
-    };
-
-    let mut output_string = String::new();
-    for i in 0..num_instructions {
-        writeln!(
-            &mut output_string,
-            "{:?}",
-            machine
-                .memory
-                .read_opcode(address_constants::ENTRY_POINT + (i * Instruction::SIZE) as Address)
-                .unwrap()
-        )?;
-    }
-
-    match output_filename {
-        Some(filename) => std::fs::write(filename, &output_string)?,
-        None => println!("{output_string}"),
-    };
-    Ok(())
-}
-
-fn load_from_stdin(machine: &mut Machine<impl display::Display>) -> Result<usize, Box<dyn Error>> {
+fn load_from_stdin(machine: &mut Machine<impl display::Display>) -> Result<(), Box<dyn Error>> {
     let instructions = read_machine_code_from_stdin()?;
-    write_buffer_as_instructions(&instructions, machine)
+    write_buffer(&instructions, machine)
 }
 
 fn read_machine_code_from_stdin() -> Result<Vec<u8>, Box<dyn Error>> {
@@ -392,31 +347,23 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 fn load_rom(
     machine: &mut Machine<impl display::Display>,
     filename: impl AsRef<Path>,
-) -> Result<usize, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
-    write_buffer_as_instructions(&buffer, machine)
+    write_buffer(&buffer, machine)
 }
 
-fn write_buffer_as_instructions(
+fn write_buffer(
     buffer: &[u8],
     machine: &mut Machine<impl display::Display>,
-) -> Result<usize, Box<dyn Error>> {
-    if buffer.len() % Instruction::SIZE != 0 {
-        return Err(format!("Filesize must be divisible by {}", Instruction::SIZE).into());
+) -> Result<(), Box<dyn Error>> {
+    if (Memory::SIZE - ENTRY_POINT as usize) < buffer.len() {
+        return Err(format!("Buffer size {} too big", buffer.len()).into());
     }
-    let iterator = buffer
-        .chunks_exact(Instruction::SIZE)
-        .map(|slice| Instruction::from_be_bytes(slice.try_into().unwrap()));
-    let num_instructions = iterator.len();
-    for (instruction, address) in
-        iterator.zip((address_constants::ENTRY_POINT..).step_by(Instruction::SIZE))
-    {
-        machine.memory.write_opcode(
-            address,
-            instruction.try_into().expect("Invalid instruction"),
-        );
+    if buffer.len() % Word::SIZE != 0 {
+        return Err(format!("Filesize must be divisible by {}", Word::SIZE).into());
     }
-    Ok(num_instructions)
+    machine.memory.data_mut()[ENTRY_POINT as usize..][..buffer.len()].copy_from_slice(buffer);
+    Ok(())
 }
 
 fn duration_since_epoch() -> Duration {

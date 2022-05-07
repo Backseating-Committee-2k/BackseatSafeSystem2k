@@ -173,7 +173,7 @@ macro_rules! opcodes {
         }
 
         #[derive(Serialize)]
-        enum RegisterUsage {
+        pub enum RegisterUsage {
             Target,
             Source,
         }
@@ -363,7 +363,7 @@ opcodes!(
     // stack instructions
     { PushRegister, 0x0015, registers(Source R register); cycles = 1, Increment::Yes, "push the value of register RR onto the stack" },
     { PopRegister, 0x0016, registers(Target R register); cycles = 1, Increment::Yes, "pop from the stack and store the value in register RR" },
-    { CallAddress, 0x0017, registers(), target_address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
+    { CallAddress, 0x0017, registers(), source_address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
     { CallRegister, 0x0036, registers(Source R register); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in register R" },
     { CallPointer, 0x0037, registers(Source P pointer); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in memory at the location specified by the value in register P" },
     { Return, 0x0018, registers(); cycles = 1, Increment::No, "pop the return address from the stack and jump to it" },

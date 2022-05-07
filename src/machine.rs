@@ -1221,7 +1221,7 @@ mod tests {
         machine.memory.write_opcode(
             address_constants::ENTRY_POINT,
             Opcode::CallAddress {
-                target_address: call_address,
+                source_address: call_address,
             },
         );
         let target_register = Register(0xAB);

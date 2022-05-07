@@ -351,7 +351,7 @@ impl Processor {
                         self.registers[register] = self.stack_pop(memory);
                     }
                     CallAddress {
-                        target_address: address,
+                        source_address: address,
                     } => {
                         self.push_instruction_pointer(memory);
                         self.set_instruction_pointer(address);

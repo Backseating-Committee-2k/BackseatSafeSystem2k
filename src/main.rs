@@ -187,6 +187,17 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
                 "TERMINAL_BUFFER_START",
                 address_constants::TERMINAL_BUFFER_START as _,
             ),
+            (
+                "TERMINAL_CURSOR_INDEX",
+                address_constants::TERMINAL_CURSOR_INDEX as _,
+            ),
+            (
+                "TERMINAL_CURSOR_MODE",
+                address_constants::TERMINAL_CURSOR_MODE as _,
+            ),
+            ("TERMINAL_CURSOR_MODE_BLINKING", CursorMode::Blinking as _),
+            ("TERMINAL_CURSOR_MODE_VISIBLE", CursorMode::Visible as _),
+            ("TERMINAL_CURSOR_MODE_INVISIBLE", CursorMode::Invisible as _),
             ("DISPLAY_WIDTH", display::WIDTH as _),
             ("DISPLAY_HEIGHT", display::HEIGHT as _),
         ]),

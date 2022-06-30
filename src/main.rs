@@ -1,4 +1,5 @@
 mod address_constants;
+mod cursor;
 mod display;
 mod dumper;
 mod keyboard;
@@ -18,11 +19,12 @@ use std::{
     io::{self, Read},
     path::{Path, PathBuf},
     rc::Rc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use address_constants::ENTRY_POINT;
 use clap::StructOpt;
+use cursor::Cursor;
 use display::{Display, DisplayImplementation};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
@@ -35,7 +37,7 @@ use raylib::prelude::*;
 use serde::{Deserialize, Serialize};
 use timer::Timer;
 
-use crate::{opcodes::OpcodeDescription, processor::Flag};
+use crate::{cursor::CursorMode, opcodes::OpcodeDescription, processor::Flag};
 
 pub struct Size2D {
     width: i32,
@@ -283,6 +285,10 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             }
         })),
         display: DisplayImplementation::new(&mut raylib_handle.borrow_mut(), &raylib_thread),
+        cursor: Cursor {
+            visible: true,
+            time_of_next_toggle: Instant::now() + Cursor::TOGGLE_INTERVAL,
+        },
     };
 
     let mut machine = Machine::new(periphery);

@@ -1,4 +1,14 @@
-use crate::{display, memory::Memory, periphery::Periphery, processor::Processor, terminal};
+use std::time::Instant;
+
+use crate::{
+    address_constants,
+    cursor::{Cursor, CursorMode},
+    display,
+    memory::Memory,
+    periphery::Periphery,
+    processor::Processor,
+    terminal,
+};
 use raylib::prelude::*;
 
 pub struct Machine<Display>
@@ -24,9 +34,36 @@ where
         }
     }
 
+    fn update_cursor(&mut self) {
+        let cursor_mode_flag = CursorMode::try_from(
+            self.memory
+                .read_data(address_constants::TERMINAL_CURSOR_MODE),
+        );
+        if let Ok(cursor_mode) = cursor_mode_flag {
+            match cursor_mode {
+                CursorMode::Blinking => {
+                    if Instant::now() >= self.periphery.cursor.time_of_next_toggle {
+                        self.periphery.cursor.visible = !self.periphery.cursor.visible;
+                        self.periphery.cursor.time_of_next_toggle += Cursor::TOGGLE_INTERVAL;
+                    }
+                }
+                CursorMode::Visible => self.periphery.cursor.visible = true,
+                CursorMode::Invisible => self.periphery.cursor.visible = false,
+            }
+        }
+    }
+
     pub fn render(&mut self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
         self.periphery.display.render(&mut self.memory, draw_handle);
-        terminal::render(&self.memory, draw_handle, Vector2::zero(), font, 20.0);
+        self.update_cursor();
+        terminal::render(
+            &self.memory,
+            draw_handle,
+            Vector2::zero(),
+            font,
+            20.0,
+            &self.periphery.cursor,
+        );
     }
 
     pub fn execute_next_instruction(&mut self) {
@@ -47,6 +84,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
+    use crate::cursor::Cursor;
     use crate::display::{Display, MockDisplay};
     use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
@@ -171,6 +211,10 @@ mod tests {
             }),
             keyboard: Keyboard::new(Box::new(|_| KeyState::Up)),
             display: MockDisplay::new(&mut (), &()),
+            cursor: Cursor {
+                visible: false,
+                time_of_next_toggle: Instant::now() + Cursor::TOGGLE_INTERVAL,
+            },
         }
     }
 

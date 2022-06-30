@@ -1,6 +1,6 @@
 // featuring Tom Hanks
 
-use crate::{address_constants, memory::Memory, Address, Size, Word};
+use crate::{address_constants, cursor::Cursor, memory::Memory, Address, Size, Word};
 use raylib::prelude::*;
 
 pub const WIDTH: usize = 80;
@@ -12,10 +12,14 @@ pub fn render(
     position: Vector2,
     font: &Font,
     font_height: f32,
+    cursor: &Cursor,
 ) {
+    let cursor_index = memory.read_data(address_constants::TERMINAL_CURSOR_INDEX) as usize;
+    let cursor_row = cursor_index / WIDTH;
+    let cursor_column = cursor_index % WIDTH;
     for row in 0..HEIGHT {
         // let words = &memory[row * WIDTH..][..WIDTH];
-        let string: String = (0..WIDTH)
+        let mut string: String = (0..WIDTH)
             .map(|i| {
                 memory.read_data(
                     address_constants::TERMINAL_BUFFER_START
@@ -31,6 +35,11 @@ pub fn render(
             })
             .map(|c| c as char)
             .collect();
+        if row == cursor_row && cursor.visible {
+            let bytes = unsafe { string.as_bytes_mut() };
+            debug_assert!(bytes[cursor_column].is_ascii());
+            bytes[cursor_column] = b'_';
+        }
         let text = string.as_str();
 
         draw_handle.draw_text_ex(

@@ -150,56 +150,105 @@ fn read_machine_code_from_stdin() -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(instructions)
 }
 
+#[derive(Serialize)]
+enum Constant {
+    Register(Register),
+    Address(Address),
+    UnsignedInteger(u64),
+}
+
 fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     #[derive(Serialize)]
     struct JsonInfo {
         opcodes: HashMap<&'static str, OpcodeDescription>,
-        constants: HashMap<&'static str, u64>,
+        constants: HashMap<&'static str, Constant>,
         flags: HashMap<&'static str, usize>,
     }
 
     let json_info = JsonInfo {
         opcodes: Opcode::as_hashmap(),
         constants: HashMap::from([
-            ("ENTRY_POINT", address_constants::ENTRY_POINT as _),
-            ("NUM_REGISTERS", Processor::NUM_REGISTERS as _),
-            ("FLAGS", Processor::FLAGS.0 as _),
-            ("INSTRUCTION_POINTER", Processor::INSTRUCTION_POINTER.0 as _),
-            ("STACK_POINTER", Processor::STACK_POINTER.0 as _),
-            ("STACK_START", address_constants::STACK_START as _),
-            ("STACK_SIZE", address_constants::STACK_SIZE as _),
+            (
+                "ENTRY_POINT",
+                Constant::Address(address_constants::ENTRY_POINT),
+            ),
+            (
+                "NUM_REGISTERS",
+                Constant::UnsignedInteger(Processor::NUM_REGISTERS as _),
+            ),
+            ("FLAGS", Constant::Register(Processor::FLAGS.0.into())),
+            (
+                "INSTRUCTION_POINTER",
+                Constant::Register(Processor::INSTRUCTION_POINTER.0.into()),
+            ),
+            (
+                "STACK_POINTER",
+                Constant::Register(Processor::STACK_POINTER.0.into()),
+            ),
+            (
+                "STACK_START",
+                Constant::Address(address_constants::STACK_START),
+            ),
+            (
+                "STACK_SIZE",
+                Constant::UnsignedInteger(address_constants::STACK_SIZE as _),
+            ),
             (
                 "FIRST_FRAMEBUFFER_START",
-                address_constants::FIRST_FRAMEBUFFER_START as _,
+                Constant::Address(address_constants::FIRST_FRAMEBUFFER_START),
             ),
             (
                 "SECOND_FRAMEBUFFER_START",
-                address_constants::SECOND_FRAMEBUFFER_START as _,
+                Constant::Address(address_constants::SECOND_FRAMEBUFFER_START),
             ),
-            ("FRAMEBUFFER_SIZE", address_constants::FRAMEBUFFER_SIZE as _),
-            ("TERMINAL_WIDTH", terminal::WIDTH as _),
-            ("TERMINAL_HEIGHT", terminal::HEIGHT as _),
+            (
+                "FRAMEBUFFER_SIZE",
+                Constant::UnsignedInteger(address_constants::FRAMEBUFFER_SIZE as _),
+            ),
+            (
+                "TERMINAL_WIDTH",
+                Constant::UnsignedInteger(terminal::WIDTH as _),
+            ),
+            (
+                "TERMINAL_HEIGHT",
+                Constant::UnsignedInteger(terminal::HEIGHT as _),
+            ),
             (
                 "TERMINAL_BUFFER_SIZE",
-                address_constants::TERMINAL_BUFFER_SIZE as _,
+                Constant::UnsignedInteger(address_constants::TERMINAL_BUFFER_SIZE as _),
             ),
             (
                 "TERMINAL_BUFFER_START",
-                address_constants::TERMINAL_BUFFER_START as _,
+                Constant::Address(address_constants::TERMINAL_BUFFER_START),
             ),
             (
                 "TERMINAL_CURSOR_INDEX",
-                address_constants::TERMINAL_CURSOR_INDEX as _,
+                Constant::Address(address_constants::TERMINAL_CURSOR_INDEX),
             ),
             (
                 "TERMINAL_CURSOR_MODE",
-                address_constants::TERMINAL_CURSOR_MODE as _,
+                Constant::Address(address_constants::TERMINAL_CURSOR_MODE),
             ),
-            ("TERMINAL_CURSOR_MODE_BLINKING", CursorMode::Blinking as _),
-            ("TERMINAL_CURSOR_MODE_VISIBLE", CursorMode::Visible as _),
-            ("TERMINAL_CURSOR_MODE_INVISIBLE", CursorMode::Invisible as _),
-            ("DISPLAY_WIDTH", display::WIDTH as _),
-            ("DISPLAY_HEIGHT", display::HEIGHT as _),
+            (
+                "TERMINAL_CURSOR_MODE_BLINKING",
+                Constant::UnsignedInteger(CursorMode::Blinking as _),
+            ),
+            (
+                "TERMINAL_CURSOR_MODE_VISIBLE",
+                Constant::UnsignedInteger(CursorMode::Visible as _),
+            ),
+            (
+                "TERMINAL_CURSOR_MODE_INVISIBLE",
+                Constant::UnsignedInteger(CursorMode::Invisible as _),
+            ),
+            (
+                "DISPLAY_WIDTH",
+                Constant::UnsignedInteger(display::WIDTH as _),
+            ),
+            (
+                "DISPLAY_HEIGHT",
+                Constant::UnsignedInteger(display::HEIGHT as _),
+            ),
         ]),
         flags: Flag::as_hashmap(),
     };

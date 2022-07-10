@@ -222,8 +222,12 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
                 Constant::Address(address_constants::TERMINAL_BUFFER_START),
             ),
             (
-                "TERMINAL_CURSOR_INDEX",
-                Constant::Address(address_constants::TERMINAL_CURSOR_INDEX),
+                "TERMINAL_BUFFER_END",
+                Constant::Address(address_constants::TERMINAL_BUFFER_END),
+            ),
+            (
+                "TERMINAL_CURSOR_POINTER",
+                Constant::Address(address_constants::TERMINAL_CURSOR_POINTER),
             ),
             (
                 "TERMINAL_CURSOR_MODE",

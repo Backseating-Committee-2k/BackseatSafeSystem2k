@@ -415,4 +415,8 @@ opcodes!(
     { PollCycleCountHighLow, 0x0039, registers(Target H high, Target L low); cycles = 1, Increment::Yes, "store the current cycle (64 bit value) count into registers H and L (H: most significant bytes, L: least significant bytes)" },
     { DumpRegisters, 0xFFFF, registers(); cycles = 1, Increment::Yes, "dump the contents of all registers into the file 'registers_YYYY-MM-DD_X.bin' where YYYY-MM-DD is the current date and X is an increasing number" },
     { DumpMemory, 0xFFFE, registers(); cycles = 1, Increment::Yes, "dump the contents of the whole memory into the file 'memory_YYYY-MM-DD_X.bin' where YYYY-MM-DD is the current date and X is an increasing number" },
+    { AssertRegisterRegister, 0xFFFD, registers(Source E expected, Source A actual); cycles = 1, Increment::Yes, "assert that the expected register value equals the actual register value (behavior of the VM on a failed assertion is implementation defined)" },
+    { AssertRegisterImmediate, 0xFFFC, registers(Source A actual), immediate; cycles = 1, Increment::Yes, "assert that the actual register value equals the immediate (behavior of the VM on a failed assertion is implementation defined)"},
+    { AssertPointerImmediate, 0xFFFB, registers(Source P pointer), immediate; cycles = 1, Increment::Yes, "assert that the value in memory pointed at by P equals the immediate (behavior of the VM on a failed assertion is implementation defined)"},
+    { DebugBreak, 0xFFFA, registers(); cycles = 1, Increment::Yes, "behavior is implementation defined" },
 );

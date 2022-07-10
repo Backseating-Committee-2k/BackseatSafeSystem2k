@@ -557,6 +557,16 @@ impl Processor {
                             eprintln!("Error dumping memory: {}", error);
                         }
                     }
+                    AssertRegisterRegister { expected, actual } => {
+                        debug_assert_eq!(self.registers[expected], self.registers[actual]);
+                    }
+                    AssertRegisterImmediate { actual, immediate } => {
+                        debug_assert_eq!(self.registers[actual], immediate);
+                    }
+                    AssertPointerImmediate { pointer, immediate } => {
+                        debug_assert_eq!(memory.read_data(self.registers[pointer]), immediate);
+                    }
+                    DebugBreak {} => panic!(),
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());
 

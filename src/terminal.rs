@@ -14,7 +14,10 @@ pub fn render(
     font_height: f32,
     cursor: &Cursor,
 ) {
-    let cursor_index = memory.read_data(address_constants::TERMINAL_CURSOR_INDEX) as usize;
+    let cursor_pointer = memory.read_data(address_constants::TERMINAL_CURSOR_POINTER) as usize;
+    debug_assert_eq!(address_constants::TERMINAL_BUFFER_START, 0); // to assume we get no overflow
+    let cursor_index =
+        (cursor_pointer - address_constants::TERMINAL_BUFFER_START as usize) / Word::SIZE;
     let cursor_row = cursor_index / WIDTH;
     let cursor_column = cursor_index % WIDTH;
     for row in 0..HEIGHT {

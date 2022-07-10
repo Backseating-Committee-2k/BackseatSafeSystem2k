@@ -5,3 +5,4 @@ roms/*
 !roms/game_of_life.backseat
 !roms/hello_world.backseat
 dumps/*
+.idea/*

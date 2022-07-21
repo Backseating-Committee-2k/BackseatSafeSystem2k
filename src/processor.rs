@@ -567,6 +567,12 @@ impl Processor {
                         debug_assert_eq!(memory.read_data(self.registers[pointer]), immediate);
                     }
                     DebugBreak {} => panic!(),
+                    PrintRegister { register } => {
+                        eprintln!(
+                            "value of register {:#x}: {:#x} ({})",
+                            register.0, self.registers[register], self.registers[register]
+                        );
+                    }
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());
 

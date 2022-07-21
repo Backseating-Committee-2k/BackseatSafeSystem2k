@@ -419,4 +419,5 @@ opcodes!(
     { AssertRegisterImmediate, 0xFFFC, registers(Source A actual), immediate; cycles = 1, Increment::Yes, "assert that the actual register value equals the immediate (behavior of the VM on a failed assertion is implementation defined)"},
     { AssertPointerImmediate, 0xFFFB, registers(Source P pointer), immediate; cycles = 1, Increment::Yes, "assert that the value in memory pointed at by P equals the immediate (behavior of the VM on a failed assertion is implementation defined)"},
     { DebugBreak, 0xFFFA, registers(); cycles = 1, Increment::Yes, "behavior is implementation defined" },
+    { PrintRegister, 0xFFF9, registers(Source R register); cycles = 1, Increment::Yes, "prints the value of the register as debug output"},
 );

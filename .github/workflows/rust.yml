@@ -1,6 +1,7 @@
 name: Rust
 
-on:
+on:  
+  workflow_dispatch:
   push:
     branches: [ "main" ]
   pull_request:
@@ -14,8 +15,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    steps:
+    steps:    
     - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: DEBIAN_FRONTEND=noninteractive sudo apt-get install xorg-dev libglu1-mesa-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests

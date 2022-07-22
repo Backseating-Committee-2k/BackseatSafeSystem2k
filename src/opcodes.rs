@@ -359,6 +359,12 @@ opcodes!(
 
     // comparison
     { CompareTargetLhsRhs, 0x0014, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "compare the values in registers LL and RR, store the result (Word::MAX, 0, 1) in TT, set zero flag appropriately" },
+    { BoolCompareEquals, 0x003A, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the values in registers L and R are equal and stores the result as boolean (0 or 1) in T" },
+    { BoolCompareNotEquals, 0x003B, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the values in registers L and R are not equal and stores the result as boolean (0 or 1) in T" },
+    { BoolCompareGreater, 0x003C, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the value in registers L is greater than the value in regsiter R and stores the result as boolean (0 or 1) in T" },
+    { BoolCompareGreaterOrEquals, 0x003D, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the value in registers L is greater than or equals the value in regsiter R and stores the result as boolean (0 or 1) in T" },
+    { BoolCompareLess, 0x003E, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the value in registers L is less than the value in regsiter R and stores the result as boolean (0 or 1) in T" },
+    { BoolCompareLessOrEquals, 0x003F, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the value in registers L is less than or equals the value in regsiter R and stores the result as boolean (0 or 1) in T" },
 
     // stack instructions
     { PushRegister, 0x0015, registers(Source R register); cycles = 1, Increment::Yes, "push the value of register RR onto the stack" },

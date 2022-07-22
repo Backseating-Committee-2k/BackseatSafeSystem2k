@@ -573,6 +573,48 @@ impl Processor {
                             register.0, self.registers[register], self.registers[register]
                         );
                     }
+                    BoolCompareEquals { target, lhs, rhs } => {
+                        self.registers[target] = if self.registers[lhs] == self.registers[rhs] {
+                            1
+                        } else {
+                            0
+                        };
+                    }
+                    BoolCompareNotEquals { target, lhs, rhs } => {
+                        self.registers[target] = if self.registers[lhs] == self.registers[rhs] {
+                            0
+                        } else {
+                            1
+                        };
+                    }
+                    BoolCompareGreater { target, lhs, rhs } => {
+                        self.registers[target] = if self.registers[lhs] > self.registers[rhs] {
+                            1
+                        } else {
+                            0
+                        };
+                    }
+                    BoolCompareGreaterOrEquals { target, lhs, rhs } => {
+                        self.registers[target] = if self.registers[lhs] >= self.registers[rhs] {
+                            1
+                        } else {
+                            0
+                        };
+                    }
+                    BoolCompareLess { target, lhs, rhs } => {
+                        self.registers[target] = if self.registers[lhs] < self.registers[rhs] {
+                            1
+                        } else {
+                            0
+                        };
+                    }
+                    BoolCompareLessOrEquals { target, lhs, rhs } => {
+                        self.registers[target] = if self.registers[lhs] <= self.registers[rhs] {
+                            1
+                        } else {
+                            0
+                        };
+                    }
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());
 

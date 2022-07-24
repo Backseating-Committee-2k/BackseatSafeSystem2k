@@ -350,6 +350,9 @@ impl Processor {
                     PopRegister { register } => {
                         self.registers[register] = self.stack_pop(memory);
                     }
+                    Pop {} => {
+                        self.stack_pop(memory);
+                    }
                     CallAddress {
                         source_address: address,
                     } => {

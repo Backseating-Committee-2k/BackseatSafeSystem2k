@@ -367,8 +367,9 @@ opcodes!(
     { BoolCompareLessOrEquals, 0x003F, registers(Target T target, Source L lhs, Source R rhs); cycles = 1, Increment::Yes, "checks whether the value in registers L is less than or equals the value in regsiter R and stores the result as boolean (0 or 1) in T" },
 
     // stack instructions
-    { PushRegister, 0x0015, registers(Source R register); cycles = 1, Increment::Yes, "push the value of register RR onto the stack" },
-    { PopRegister, 0x0016, registers(Target R register); cycles = 1, Increment::Yes, "pop from the stack and store the value in register RR" },
+    { PushRegister, 0x0015, registers(Source R register); cycles = 1, Increment::Yes, "pushes the value of register RR onto the stack" },
+    { PopRegister, 0x0016, registers(Target R register); cycles = 1, Increment::Yes, "pops from the stack and stores the value in register RR" },
+    { Pop, 0x0040, registers(); cycles = 1, Increment::Yes, "pops from the stack and discards the value" },
     { CallAddress, 0x0017, registers(), source_address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
     { CallRegister, 0x0036, registers(Source R register); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in register R" },
     { CallPointer, 0x0037, registers(Source P pointer); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in memory at the location specified by the value in register P" },

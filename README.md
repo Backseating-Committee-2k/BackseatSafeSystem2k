@@ -5,7 +5,7 @@
 
 # BackseatSafeSystem2k
 
-This is the official implementation of the platform invented by the twitch stream [coder2k](https://www.twitch.tv/coder2k).
+This is the official implementation of the platform invented by the Twitch chat of [coder2k](https://twitch.tv/coder2k).
 
 ## Features
 
@@ -15,7 +15,7 @@ This is the official implementation of the platform invented by the twitch strea
 
 ## How to build
 
-The project uses [cargo]([https://crates.io](https://crates.io)) as build system. All dependencies are fetched automatically. Build the
+The project uses [cargo]([https://cmake.org/](https://crates.io)) as build system. All dependencies are fetched automatically. All dependencies are fetched automatically. Build the
 software like so:
 
 ```

@@ -15,8 +15,7 @@ This is the official implementation of the platform invented by the Twitch chat 
 
 ## How to build
 
-The project uses [cargo]([https://crates.io](https://crates.io)) as build system. All dependencies are fetched automatically. All dependencies are fetched automatically. Build the
-software like so:
+The project uses [cargo]([https://crates.io](https://crates.io)) as build system. All dependencies are fetched automatically.  Build the software like so:
 
 ```
 git clone https://github.com/Backseating-Committee-2k/BackseatSafeSystem2k.git

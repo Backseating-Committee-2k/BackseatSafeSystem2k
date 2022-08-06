@@ -15,7 +15,7 @@ This is the official implementation of the platform invented by the Twitch chat 
 
 ## How to build
 
-The project uses [cargo]([https://cmake.org/](https://crates.io)) as build system. All dependencies are fetched automatically. All dependencies are fetched automatically. Build the
+The project uses [cargo]([https://crates.io](https://crates.io)) as build system. All dependencies are fetched automatically. All dependencies are fetched automatically. Build the
 software like so:
 
 ```

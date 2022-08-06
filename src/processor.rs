@@ -561,7 +561,7 @@ impl Processor {
                         }
                     }
                     AssertRegisterRegister { expected, actual } => {
-                        debug_assert_eq!(self.registers[expected], self.registers[actual]);
+                        debug_assert_eq!(self.registers[actual], self.registers[expected]);
                     }
                     AssertRegisterImmediate { actual, immediate } => {
                         debug_assert_eq!(self.registers[actual], immediate);

@@ -21,7 +21,7 @@
             },
             "args": [
                 "run",
-                "./roms/halt.backseat"
+                "./roms/hello_world.backseat"
             ],
             "cwd": "${workspaceFolder}"
         },

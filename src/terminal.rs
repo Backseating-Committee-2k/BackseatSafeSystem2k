@@ -1,11 +1,14 @@
 // featuring Tom Hanks
 
 use crate::{address_constants, cursor::Cursor, memory::Memory, Address, Size, Word};
+
+#[cfg(feature = "graphics")]
 use raylib::prelude::*;
 
 pub const WIDTH: usize = 80;
 pub const HEIGHT: usize = 25;
 
+#[cfg(feature = "graphics")]
 pub fn render(
     memory: &Memory,
     draw_handle: &mut RaylibDrawHandle,

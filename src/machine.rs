@@ -9,6 +9,8 @@ use crate::{
     processor::Processor,
     terminal,
 };
+
+#[cfg(feature = "graphics")]
 use raylib::prelude::*;
 
 pub struct Machine<Display>
@@ -25,10 +27,10 @@ impl<Display> Machine<Display>
 where
     Display: display::Display,
 {
-    pub fn new(periphery: Periphery<Display>) -> Self {
+    pub fn new(periphery: Periphery<Display>, exit_on_halt: bool) -> Self {
         Self {
             memory: Memory::new(),
-            processor: Processor::new(),
+            processor: Processor::new(exit_on_halt),
             periphery,
             is_halted: false,
         }
@@ -53,6 +55,7 @@ where
         }
     }
 
+    #[cfg(feature = "graphics")]
     pub fn render(&mut self, draw_handle: &mut RaylibDrawHandle, font: &Font) {
         self.periphery.display.render(&mut self.memory, draw_handle);
         self.update_cursor();
@@ -175,7 +178,7 @@ mod tests {
     }
 
     fn create_machine_with_opcodes(opcodes: &[Opcode]) -> Machine<MockDisplay> {
-        let mut machine = Machine::new(create_mock_periphery());
+        let mut machine = Machine::new(create_mock_periphery(), false);
         for (&opcode, address) in opcodes
             .iter()
             .zip((address_constants::ENTRY_POINT..).step_by(Instruction::SIZE))
@@ -257,7 +260,7 @@ mod tests {
 
     #[test]
     fn move_from_one_register_to_another() {
-        let mut machine = Machine::new(create_mock_periphery());
+        let mut machine = Machine::new(create_mock_periphery(), false);
         let source = 0x5.into();
         let target = 0x0A.into();
         let data = 0xCAFE;
@@ -1192,7 +1195,7 @@ mod tests {
 
     #[test]
     fn push_and_pop_stack_value() {
-        let mut machine = Machine::new(create_mock_periphery());
+        let mut machine = Machine::new(create_mock_periphery(), false);
         let source_register = 0xAB.into();
         let target_register = 0x06.into();
         let data = 42;
@@ -1231,7 +1234,7 @@ mod tests {
     #[test]
     fn push_and_pop_multiple_stack_values() {
         let values = [1, 4, 5, 42, 2, 3];
-        let mut machine = Machine::new(create_mock_periphery());
+        let mut machine = Machine::new(create_mock_periphery(), false);
         for (register, value) in (0..).map(Register).zip(values) {
             machine.processor.registers[register] = value;
             machine = execute_instruction_with_machine(machine, PushRegister { register });
@@ -1260,7 +1263,7 @@ mod tests {
 
     #[test]
     fn call_and_return() {
-        let mut machine: Machine<MockDisplay> = Machine::new(create_mock_periphery());
+        let mut machine: Machine<MockDisplay> = Machine::new(create_mock_periphery(), false);
         let call_address = address_constants::ENTRY_POINT + 200 * Instruction::SIZE as Address;
         machine.memory.write_opcode(
             address_constants::ENTRY_POINT,
@@ -1701,6 +1704,7 @@ mod tests {
     );
 
     #[test]
+    #[cfg(feature = "graphics")]
     fn get_keystate() {
         let keycode_register = 0.into();
         let target_register = 1.into();

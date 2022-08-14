@@ -25,7 +25,7 @@ use std::{
 use address_constants::ENTRY_POINT;
 use clap::StructOpt;
 use cursor::Cursor;
-use display::{Display, DisplayImplementation};
+use display::{Display, DisplayImplementation, MockDisplay};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use memory::Memory;
@@ -33,9 +33,11 @@ use num_format::{CustomFormat, ToFormattedString};
 use opcodes::Opcode;
 use periphery::Periphery;
 use processor::Processor;
-use raylib::prelude::*;
 use serde::{Deserialize, Serialize};
 use timer::Timer;
+
+#[cfg(feature = "graphics")]
+use raylib::prelude::*;
 
 use crate::{cursor::CursorMode, opcodes::OpcodeDescription, processor::Flag};
 
@@ -110,6 +112,11 @@ enum Action {
     Run {
         /// The path to the ROM file to be executed
         path: Option<PathBuf>,
+
+        /// Applying this flag makes the application quit when executing the 'halt and catch fire'-
+        /// instruction.
+        #[clap(short, long, action)]
+        exit_on_halt: bool,
     },
     /// Emit a sample program as machine code
     Emit {
@@ -133,7 +140,7 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     match args.action {
-        Action::Run { path } => run(path.as_deref()),
+        Action::Run { path, exit_on_halt } => run(path.as_deref(), exit_on_halt),
         Action::Emit { path } => emit(path.as_deref()),
         Action::Json { path } => print_json(path.as_deref()),
     }
@@ -330,16 +337,22 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
+fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Error>> {
+    #[cfg(feature = "graphics")]
     let (raylib_handle, raylib_thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
         .title("Backseater")
         .build();
+
+    #[cfg(feature = "graphics")]
     let raylib_handle = Rc::new(RefCell::new(raylib_handle));
+
+    #[cfg(feature = "graphics")]
     let raylib_handle_copy = Rc::clone(&raylib_handle);
     let periphery = Periphery {
         timer: Timer::new(ms_since_epoch),
         keyboard: Keyboard::new(Box::new(move |key| {
+            #[cfg(feature = "graphics")]
             match raylib_handle_copy.borrow().is_key_down(
                 raylib::input::key_from_i32(key.try_into().expect("keycode out of range"))
                     .expect("invalid keycode"),
@@ -347,21 +360,30 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
                 true => KeyState::Down,
                 false => KeyState::Up,
             }
+
+            #[cfg(not(feature = "graphics"))]
+            KeyState::Up
         })),
+        #[cfg(feature = "graphics")]
         display: DisplayImplementation::new(&mut raylib_handle.borrow_mut(), &raylib_thread),
+
+        #[cfg(not(feature = "graphics"))]
+        display: MockDisplay::new(&mut (), &mut ()),
+
         cursor: Cursor {
             visible: true,
             time_of_next_toggle: Instant::now() + Cursor::TOGGLE_INTERVAL,
         },
     };
 
-    let mut machine = Machine::new(periphery);
+    let mut machine = Machine::new(periphery, exit_on_halt);
 
     match rom_filename {
         Some(filename) => load_rom(&mut machine, filename)?,
         None => load_from_stdin(&mut machine)?,
     };
 
+    #[cfg(feature = "graphics")]
     let font = raylib_handle
         .borrow_mut()
         .load_font(&raylib_thread, "./resources/CozetteVector.ttf")?;
@@ -378,8 +400,18 @@ fn run(rom_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
 
     let custom_number_format = CustomFormat::builder().separator(" ").build()?;
 
-    while !raylib_handle.borrow().window_should_close() {
+    while {
+        #[cfg(feature = "graphics")]
+        {
+            !raylib_handle.borrow().window_should_close()
+        }
+        #[cfg(not(feature = "graphics"))]
+        {
+            true
+        }
+    } {
         let current_time = ms_since_epoch();
+        #[cfg(feature = "graphics")]
         render_if_needed(
             current_time,
             &mut time_measurements,
@@ -447,7 +479,10 @@ fn ms_since_epoch() -> u64 {
     since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
-fn execute_next_instruction(machine: &mut Machine<DisplayImplementation>) {
+fn execute_next_instruction<Display>(machine: &mut Machine<Display>)
+where
+    Display: crate::Display,
+{
     if !machine.is_halted() {
         machine.execute_next_instruction();
     }
@@ -476,6 +511,7 @@ struct TimeMeasurements {
     clock_frequency_average: u64,
 }
 
+#[cfg(feature = "graphics")]
 fn render_if_needed(
     current_time: u64,
     time_measurements: &mut TimeMeasurements,
@@ -506,6 +542,7 @@ fn render_if_needed(
     }
 }
 
+#[cfg(feature = "graphics")]
 fn render(
     draw_handle: &mut RaylibDrawHandle,
     machine: &mut Machine<DisplayImplementation>,
@@ -535,6 +572,7 @@ fn calculate_clock_frequency(
     }
 }
 
+#[cfg(feature = "graphics")]
 fn draw_clock_frequency(
     time_measurements: &TimeMeasurements,
     custom_number_format: &CustomFormat,

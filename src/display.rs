@@ -1,10 +1,13 @@
+#[cfg(feature = "graphics")]
+use crate::SCREEN_SIZE;
+#[cfg(feature = "graphics")]
 use raylib::{
     ffi::RenderTexture,
     prelude::{RaylibDraw, RaylibDrawHandle},
     texture::{RaylibTexture2D, RenderTexture2D},
 };
 
-use crate::{address_constants, memory::Memory, Address, SCREEN_SIZE};
+use crate::{address_constants, memory::Memory, Address};
 
 pub const WIDTH: usize = 480;
 pub const HEIGHT: usize = WIDTH / 4 * 3;
@@ -16,6 +19,8 @@ pub trait Display {
     fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self;
     fn swap(&mut self);
     fn is_first_framebuffer_visible(&self) -> bool;
+
+    #[cfg(feature = "graphics")]
     fn render(&mut self, memory: &mut Memory, handle: &mut RaylibDrawHandle);
 
     fn invisible_framebuffer_address(&self) -> Address {
@@ -48,6 +53,7 @@ impl Display for MockDisplay {
         self.first_framebuffer_visible
     }
 
+    #[cfg(feature = "graphics")]
     fn render(&mut self, _: &mut Memory, _: &mut RaylibDrawHandle) {
         // do nothing
     }
@@ -55,9 +61,12 @@ impl Display for MockDisplay {
 
 pub struct DisplayImplementation {
     first_framebuffer_visible: bool,
+
+    #[cfg(feature = "graphics")]
     texture: RenderTexture2D,
 }
 
+#[cfg(feature = "graphics")]
 impl Display for DisplayImplementation {
     type Handle = raylib::RaylibHandle;
     type Thread = raylib::RaylibThread;
@@ -94,6 +103,26 @@ impl Display for DisplayImplementation {
             scale,
             tint_color,
         );
+    }
+
+    fn swap(&mut self) {
+        self.first_framebuffer_visible = !self.first_framebuffer_visible;
+    }
+
+    fn is_first_framebuffer_visible(&self) -> bool {
+        self.first_framebuffer_visible
+    }
+}
+
+#[cfg(not(feature = "graphics"))]
+impl Display for DisplayImplementation {
+    type Handle = ();
+    type Thread = ();
+
+    fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self {
+        DisplayImplementation {
+            first_framebuffer_visible: true,
+        }
     }
 
     fn swap(&mut self) {

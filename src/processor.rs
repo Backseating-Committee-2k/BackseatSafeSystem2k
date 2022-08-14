@@ -1,6 +1,7 @@
 #![allow(non_upper_case_globals)]
 
 use std::ops::{Index, IndexMut};
+use std::process::Termination;
 
 use crate::keyboard::KeyState;
 use crate::opcodes::Opcode;
@@ -76,6 +77,7 @@ impl<const SIZE: usize> IndexMut<Register> for Registers<SIZE> {
 pub struct Processor {
     pub registers: Registers<{ Self::NUM_REGISTERS }>,
     cycle_count: u64,
+    exit_on_halt: bool,
 }
 
 impl Processor {
@@ -84,10 +86,11 @@ impl Processor {
     pub const INSTRUCTION_POINTER: Register = Register((Self::NUM_REGISTERS - 2) as _);
     pub const STACK_POINTER: Register = Register((Self::NUM_REGISTERS - 1) as _);
 
-    pub fn new() -> Self {
+    pub fn new(exit_on_halt: bool) -> Self {
         let mut result = Self {
             registers: Registers([0; Self::NUM_REGISTERS]),
             cycle_count: 0,
+            exit_on_halt,
         };
         result.registers[Self::INSTRUCTION_POINTER] = address_constants::ENTRY_POINT;
         result.registers[Self::STACK_POINTER] = address_constants::STACK_START;
@@ -197,6 +200,9 @@ impl Processor {
                     }
                     HaltAndCatchFire {} => {
                         println!("HALT AND CATCH FIRE!");
+                        if self.exit_on_halt {
+                            std::process::exit(0);
+                        }
                         halted = true;
                     }
                     AddTargetLhsRhs { target, lhs, rhs } => {

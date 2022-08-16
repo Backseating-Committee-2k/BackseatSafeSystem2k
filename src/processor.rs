@@ -78,6 +78,7 @@ pub struct Processor {
     pub registers: Registers<{ Self::NUM_REGISTERS }>,
     cycle_count: u64,
     exit_on_halt: bool,
+    checkpoint_counter: Word,
 }
 
 impl Processor {
@@ -91,6 +92,7 @@ impl Processor {
             registers: Registers([0; Self::NUM_REGISTERS]),
             cycle_count: 0,
             exit_on_halt,
+            checkpoint_counter: 0,
         };
         result.registers[Self::INSTRUCTION_POINTER] = address_constants::ENTRY_POINT;
         result.registers[Self::STACK_POINTER] = address_constants::STACK_START;
@@ -623,6 +625,15 @@ impl Processor {
                         } else {
                             0
                         };
+                    }
+                    Checkpoint { immediate } => {
+                        if immediate != self.checkpoint_counter {
+                            panic!(
+                                "checkpoint counter mismatch: expected {}, got {}",
+                                immediate, self.checkpoint_counter
+                            );
+                        }
+                        self.checkpoint_counter += 1;
                     }
                 }
                 self.increase_cycle_count(opcode.get_num_cycles().into());

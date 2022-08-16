@@ -38,11 +38,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: DEBIAN_FRONTEND=noninteractive sudo apt-get install xorg-dev
     - name: Build
       run: cargo build --no-default-features --verbose
     - name: Run tests
-      run: cargo test --verbose
-
-
+      run: cargo test --no-default-features --verbose

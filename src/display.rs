@@ -92,9 +92,12 @@ impl Display for DisplayImplementation {
             a: 0xFF,
         };
         let scale = SCREEN_SIZE.height as f32 / HEIGHT as f32;
+        let framebuffer_start = match self.is_first_framebuffer_visible() {
+            true => address_constants::FIRST_FRAMEBUFFER_START,
+            false => address_constants::SECOND_FRAMEBUFFER_START,
+        } as usize;
         self.texture.update_texture(
-            &memory.data()[address_constants::FIRST_FRAMEBUFFER_START as usize..]
-                [..address_constants::FRAMEBUFFER_SIZE],
+            &memory.data()[framebuffer_start..][..address_constants::FRAMEBUFFER_SIZE],
         );
         handle.draw_texture_ex(
             &self.texture,

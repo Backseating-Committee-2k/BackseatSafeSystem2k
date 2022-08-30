@@ -61,7 +61,8 @@ pub const TARGET_FPS: u64 = 60;
 
 pub type Instruction = u64;
 pub type Word = u32;
-pub type HalfWord = u16;
+pub type Halfword = u16;
+pub type Byte = u8;
 pub type Address = u32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,17 +74,17 @@ impl From<u8> for Register {
     }
 }
 
-const _: () = static_assert(HalfWord::SIZE * 2 == Word::SIZE);
+const _: () = static_assert(Halfword::SIZE * 2 == Word::SIZE);
 
-pub trait AsHalfWords {
-    fn as_half_words(&self) -> (HalfWord, HalfWord);
+pub trait AsHalfwords {
+    fn as_halfwords(&self) -> (Halfword, Halfword);
 }
 
-impl AsHalfWords for Word {
-    fn as_half_words(&self) -> (HalfWord, HalfWord) {
+impl AsHalfwords for Word {
+    fn as_halfwords(&self) -> (Halfword, Halfword) {
         (
-            (self >> (8 * HalfWord::SIZE)) as HalfWord,
-            *self as HalfWord,
+            (self >> (8 * Halfword::SIZE)) as Halfword,
+            *self as Halfword,
         )
     }
 }
@@ -104,7 +105,7 @@ pub trait Size: Sized {
 
 impl Size for Instruction {}
 impl Size for Word {}
-impl Size for HalfWord {}
+impl Size for Halfword {}
 
 #[derive(clap::Subcommand, Debug)]
 enum Action {

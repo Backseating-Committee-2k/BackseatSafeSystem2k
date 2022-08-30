@@ -1,4 +1,4 @@
-use crate::{opcodes::Opcode, Address, Instruction, Size, Word};
+use crate::{opcodes::Opcode, Address, Byte, Halfword, Instruction, Size, Word};
 
 pub struct Memory {
     data: Vec<u8>,
@@ -37,6 +37,16 @@ impl Memory {
         Word::from_be_bytes(slice.try_into().unwrap())
     }
 
+    pub fn read_halfword(&self, address: Address) -> Halfword {
+        debug_assert!(address as usize % Halfword::SIZE == 0);
+        let slice = &self.data[address as usize..][..Halfword::SIZE];
+        Halfword::from_be_bytes(slice.try_into().unwrap())
+    }
+
+    pub fn read_byte(&self, address: Address) -> Byte {
+        self.data[address as usize]
+    }
+
     pub fn write_opcode(&mut self, address: Address, opcode: Opcode) {
         debug_assert!(address as usize % Instruction::SIZE == 0);
         let instruction = opcode.as_instruction();
@@ -48,6 +58,15 @@ impl Memory {
     pub fn write_data(&mut self, address: Address, data: Word) {
         debug_assert!(address as usize % Word::SIZE == 0);
         self.data[address as usize..][..Word::SIZE].copy_from_slice(&data.to_be_bytes());
+    }
+
+    pub fn write_halfword(&mut self, address: Address, data: Halfword) {
+        debug_assert!(address as usize % Halfword::SIZE == 0);
+        self.data[address as usize..][..Halfword::SIZE].copy_from_slice(&data.to_be_bytes());
+    }
+
+    pub fn write_byte(&mut self, address: Address, data: Byte) {
+        self.data[address as usize] = data;
     }
 }
 

@@ -1,12 +1,11 @@
 #![allow(non_upper_case_globals)]
 
 use std::ops::{Index, IndexMut};
-use std::process::Termination;
 
 use crate::keyboard::KeyState;
 use crate::opcodes::Opcode;
 use crate::periphery::Periphery;
-use crate::{address_constants, display};
+use crate::{address_constants, display, Byte, Halfword};
 use crate::{dumper, static_assert};
 use crate::{memory::Memory, Address, Instruction, Word};
 use crate::{Register, Size};
@@ -200,6 +199,56 @@ impl Processor {
                     MovePointerSource { pointer, source } => {
                         memory.write_data(self.registers[pointer], self.registers[source]);
                     }
+                    MoveByteRegisterAddress {
+                        register,
+                        source_address,
+                    } => self.registers[register] = memory.read_byte(source_address) as Word,
+                    MoveByteAddressRegister {
+                        register,
+                        target_address,
+                    } => memory.write_byte(target_address, self.registers[register] as u8),
+                    MoveByteTargetPointer { target, pointer } => {
+                        self.registers[target] = memory.read_byte(self.registers[pointer]) as Word
+                    }
+                    MoveBytePointerSource { pointer, source } => {
+                        memory.write_byte(self.registers[pointer], self.registers[source] as u8)
+                    }
+                    MoveHalfwordRegisterAddress {
+                        register,
+                        source_address,
+                    } => self.registers[register] = memory.read_halfword(source_address).into(),
+                    MoveHalfwordAddressRegister {
+                        register,
+                        target_address,
+                    } => memory.write_halfword(target_address, self.registers[register] as u16),
+                    MoveHalfwordTargetPointer { target, pointer } => {
+                        self.registers[target] =
+                            memory.read_halfword(self.registers[pointer]).into()
+                    }
+                    MoveHalfwordPointerSource { pointer, source } => memory
+                        .write_halfword(self.registers[pointer], self.registers[source] as u16),
+                    MovePointerSourceOffset {
+                        pointer,
+                        source,
+                        immediate,
+                    } => memory
+                        .write_data(self.registers[pointer] + immediate, self.registers[source]),
+                    MoveBytePointerSourceOffset {
+                        pointer,
+                        source,
+                        immediate,
+                    } => memory.write_byte(
+                        self.registers[pointer] + immediate,
+                        self.registers[source] as Byte,
+                    ),
+                    MoveHalfwordPointerSourceOffset {
+                        pointer,
+                        source,
+                        immediate,
+                    } => memory.write_halfword(
+                        self.registers[pointer] + immediate,
+                        self.registers[source] as Halfword,
+                    ),
                     HaltAndCatchFire {} => {
                         println!("HALT AND CATCH FIRE!");
                         if self.exit_on_halt {

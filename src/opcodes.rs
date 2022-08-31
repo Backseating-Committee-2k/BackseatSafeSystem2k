@@ -1,4 +1,4 @@
-use crate::{Address, AsHalfWords, AsWords, Instruction, Register, Word};
+use crate::{Address, AsHalfwords, AsWords, Instruction, Register, Word};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -290,8 +290,8 @@ macro_rules! opcodes {
             type Error = &'static str;
 
             fn try_from(value: Instruction) -> Result<Self, Self::Error> {
-                #![allow(clippy::eval_order_dependence)]
-                let opcode = value.as_words().0.as_half_words().0;
+                #![allow(clippy::mixed_read_write_in_expression)]
+                let opcode = value.as_words().0.as_halfwords().0;
                 let register_values = &value.to_be_bytes()[2..];
                 let mut registers = [Register(0); 6];
                 for (i, register) in registers.iter_mut().enumerate() {
@@ -335,6 +335,20 @@ opcodes!(
     { MoveAddressRegister, 0x0003, registers(Source R register), target_address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A" },
     { MoveTargetPointer, 0x0004, registers(Target T target, Source P pointer); cycles = 1, Increment::Yes, "move the contents addressed by the value of register P into register T" },
     { MovePointerSource, 0x0005, registers(Target P pointer, Source S source); cycles = 1, Increment::Yes, "move the contents of register S into memory at address specified by register P" },
+    // move instructions for byte-sized access
+    { MoveByteRegisterAddress, 0x0041, registers(Target R register), source_address; cycles = 1, Increment::Yes, "move the value at address A into register R (1 byte)"},
+    { MoveByteAddressRegister, 0x0042, registers(Source R register), target_address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A (1 byte)" },
+    { MoveByteTargetPointer, 0x0043, registers(Target T target, Source P pointer); cycles = 1, Increment::Yes, "move the contents addressed by the value of register P into register T (1 byte)" },
+    { MoveBytePointerSource, 0x0044, registers(Target P pointer, Source S source); cycles = 1, Increment::Yes, "move the contents of register S into memory at address specified by register P (1 byte)" },
+    // move instructions for halfword-sized access
+    { MoveHalfwordRegisterAddress, 0x0045, registers(Target R register), source_address; cycles = 1, Increment::Yes, "move the value at address A into register R (2 bytes)"},
+    { MoveHalfwordAddressRegister, 0x0046, registers(Source R register), target_address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A (2 bytes)" },
+    { MoveHalfwordTargetPointer, 0x0047, registers(Target T target, Source P pointer); cycles = 1, Increment::Yes, "move the contents addressed by the value of register P into register T (2 bytes)" },
+    { MoveHalfwordPointerSource, 0x0048, registers(Target P pointer, Source S source); cycles = 1, Increment::Yes, "move the contents of register S into memory at address specified by register P (2 bytes)" },
+    // offset move-instructions
+    { MovePointerSourceOffset, 0x0049, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate" },
+    { MoveBytePointerSourceOffset, 0x004A, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate (1 byte)" },
+    { MoveHalfwordPointerSourceOffset, 0x004B, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate (2 bytes)" },
 
     // halt and catch fire
     { HaltAndCatchFire, 0x0006, registers(); cycles = 1, Increment::No, "halt and catch fire" },

@@ -258,6 +258,30 @@ mod tests {
         registers_post = [(register, data)],
     );
 
+    create_test!(
+        move_byte_from_address_into_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABCD_1234;
+            let register = 0x0A.into();
+        },
+        opcodes = &[MoveByteRegisterAddress { register, source_address: address }],
+        memory_pre = [data => address],
+        registers_post = [(register, 0xAB)],
+    );
+
+    create_test!(
+        move_halfword_from_address_into_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABCD_1234;
+            let register = 0x0A.into();
+        },
+        opcodes = &[MoveHalfwordRegisterAddress { register, source_address: address }],
+        memory_pre = [data => address],
+        registers_post = [(register, 0xABCD)],
+    );
+
     #[test]
     fn move_from_one_register_to_another() {
         let mut machine = Machine::new(create_mock_periphery(), false);
@@ -283,6 +307,30 @@ mod tests {
     );
 
     create_test!(
+        move_byte_from_register_into_memory,
+        setup = {
+            let register = Register(5);
+            let data = 0xC0FFEE;
+            let address = 0xF0;
+        },
+        opcodes = &[MoveByteAddressRegister { target_address: address, register }],
+        registers_pre = [data => register],
+        memory_post = [(address, 0xEE000000)],
+    );
+
+    create_test!(
+        move_halfword_from_register_into_memory,
+        setup = {
+            let register = Register(5);
+            let data = 0xC0FFEE;
+            let address = 0xF0;
+        },
+        opcodes = &[MoveHalfwordAddressRegister { target_address: address, register }],
+        registers_pre = [data => register],
+        memory_post = [(address, 0xFFEE0000)],
+    );
+
+    create_test!(
         move_from_memory_addressed_by_register_into_another_register,
         setup = {
             let address = 0xF0;
@@ -294,6 +342,34 @@ mod tests {
         registers_pre = [address => pointer],
         memory_pre = [data => address],
         registers_post = [(target, data)],
+    );
+
+    create_test!(
+        move_byte_from_memory_addressed_by_register_into_another_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABC0FFEE;
+            let target = 0x0A.into();
+            let pointer = 0x05.into();
+        },
+        opcodes = &[MoveByteTargetPointer { target, pointer }],
+        registers_pre = [address => pointer],
+        memory_pre = [data => address],
+        registers_post = [(target, 0xAB)],
+    );
+
+    create_test!(
+        move_halfword_from_memory_addressed_by_register_into_another_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABC0FFEE;
+            let target = 0x0A.into();
+            let pointer = 0x05.into();
+        },
+        opcodes = &[MoveHalfwordTargetPointer { target, pointer }],
+        registers_pre = [address => pointer],
+        memory_pre = [data => address],
+        registers_post = [(target, 0xABC0)],
     );
 
     create_test!(
@@ -313,6 +389,38 @@ mod tests {
     );
 
     create_test!(
+        move_byte_from_memory_addressed_by_register_into_same_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABC0FFEE;
+            let register = 0x05.into();
+        },
+        opcodes = &[MoveByteTargetPointer {
+            target: register,
+            pointer: register,
+        }],
+        registers_pre = [address => register],
+        memory_pre = [data => address],
+        registers_post = [(register, 0xAB)],
+    );
+
+    create_test!(
+        move_halfword_from_memory_addressed_by_register_into_same_register,
+        setup = {
+            let address = 0xF0;
+            let data = 0xABC0FFEE;
+            let register = 0x05.into();
+        },
+        opcodes = &[MoveHalfwordTargetPointer {
+            target: register,
+            pointer: register,
+        }],
+        registers_pre = [address => register],
+        memory_pre = [data => address],
+        registers_post = [(register, 0xABC0)],
+    );
+
+    create_test!(
         move_from_register_into_memory_addressed_by_another_register,
         setup = {
             let data = 0xC0FFEE;
@@ -326,6 +434,32 @@ mod tests {
     );
 
     create_test!(
+        move_byte_from_register_into_memory_addressed_by_another_register,
+        setup = {
+            let data = 0xC0FFEE;
+            let address = 0xF0;
+            let pointer = 0x0A.into();
+            let source = 0x05.into();
+        },
+        opcodes = &[MoveBytePointerSource { pointer, source }],
+        registers_pre = [data => source, address => pointer],
+        memory_post = [(address, 0xEE000000)],
+    );
+
+    create_test!(
+        move_halfword_from_register_into_memory_addressed_by_another_register,
+        setup = {
+            let data = 0xC0FFEE;
+            let address = 0xF0;
+            let pointer = 0x0A.into();
+            let source = 0x05.into();
+        },
+        opcodes = &[MoveHalfwordPointerSource { pointer, source }],
+        registers_pre = [data => source, address => pointer],
+        memory_post = [(address, 0xFFEE0000)],
+    );
+
+    create_test!(
         move_from_register_into_memory_addressed_by_same_register,
         setup = {
             let address = 0xF0;
@@ -334,6 +468,70 @@ mod tests {
         opcodes = &[MovePointerSource { pointer: register, source: register }],
         registers_pre = [address => register],
         memory_post = [(address, address)],
+    );
+
+    create_test!(
+        move_byte_from_register_into_memory_addressed_by_same_register,
+        setup = {
+            let address = 0x1F0;
+            let register = 0x05.into();
+        },
+        opcodes = &[MoveBytePointerSource { pointer: register, source: register }],
+        registers_pre = [address => register],
+        memory_post = [(address, 0xF0000000)],
+    );
+
+    create_test!(
+        move_halfword_from_register_into_memory_addressed_by_same_register,
+        setup = {
+            let address = 0x1F0;
+            let register = 0x05.into();
+        },
+        opcodes = &[MoveHalfwordPointerSource { pointer: register, source: register }],
+        registers_pre = [address => register],
+        memory_post = [(address, 0x01F00000)],
+    );
+
+    create_test!(
+        move_from_register_into_memory_with_offset,
+        setup = {
+            let address = 0x1F0;
+            let offset = 12;
+            let pointer = 0x05.into();
+            let source = 0x04.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MovePointerSourceOffset { pointer, source, immediate: offset }],
+        registers_pre = [address => pointer, value => source],
+        memory_post = [(address + offset, value)],
+    );
+
+    create_test!(
+        move_byte_from_register_into_memory_with_offset,
+        setup = {
+            let address = 0x1F0;
+            let offset = 12;
+            let pointer = 0x05.into();
+            let source = 0x04.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MoveBytePointerSourceOffset { pointer, source, immediate: offset }],
+        registers_pre = [address => pointer, value => source],
+        memory_post = [(address + offset, 0x34000000)],
+    );
+
+    create_test!(
+        move_halfword_from_register_into_memory_with_offset,
+        setup = {
+            let address = 0x1F0;
+            let offset = 12;
+            let pointer = 0x05.into();
+            let source = 0x04.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MoveHalfwordPointerSourceOffset { pointer, source, immediate: offset }],
+        registers_pre = [address => pointer, value => source],
+        memory_post = [(address + offset, 0x12340000)],
     );
 
     create_test!(

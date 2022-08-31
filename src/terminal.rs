@@ -19,24 +19,22 @@ pub fn render(
 ) {
     let cursor_pointer = memory.read_data(address_constants::TERMINAL_CURSOR_POINTER) as usize;
     debug_assert_eq!(address_constants::TERMINAL_BUFFER_START, 0); // to assume we get no overflow
-    let cursor_index =
-        (cursor_pointer - address_constants::TERMINAL_BUFFER_START as usize) / Word::SIZE;
+    let cursor_index = cursor_pointer - address_constants::TERMINAL_BUFFER_START as usize;
     let cursor_row = cursor_index / WIDTH;
     let cursor_column = cursor_index % WIDTH;
     for row in 0..HEIGHT {
         // let words = &memory[row * WIDTH..][..WIDTH];
         let mut string: String = (0..WIDTH)
             .map(|i| {
-                memory.read_data(
-                    address_constants::TERMINAL_BUFFER_START
-                        + (row * WIDTH * Word::SIZE + i * Word::SIZE) as Address,
+                memory.read_byte(
+                    address_constants::TERMINAL_BUFFER_START + (row * WIDTH + i) as Address,
                 )
             })
-            .map(|word| {
-                if !(32..=255).contains(&word) {
+            .map(|byte| {
+                if !(32..=255).contains(&byte) {
                     b' '
                 } else {
-                    word as u8
+                    byte as u8
                 }
             })
             .map(|c| c as char)

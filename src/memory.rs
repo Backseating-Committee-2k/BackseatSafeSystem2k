@@ -25,20 +25,20 @@ impl Memory {
         &self,
         address: Address,
     ) -> Result<Opcode, <Opcode as TryFrom<Instruction>>::Error> {
-        debug_assert!(address as usize % Instruction::SIZE == 0);
+        debug_assert_eq!(address as usize % Instruction::SIZE, 0);
         let slice = &self.data[address as usize..][..Instruction::SIZE];
         let instruction = Instruction::from_be_bytes(slice.try_into().unwrap());
         instruction.try_into()
     }
 
     pub fn read_data(&self, address: Address) -> Word {
-        debug_assert!(address as usize % Word::SIZE == 0);
+        debug_assert_eq!(address as usize % Word::SIZE, 0);
         let slice = &self.data[address as usize..][..Word::SIZE];
         Word::from_be_bytes(slice.try_into().unwrap())
     }
 
     pub fn read_halfword(&self, address: Address) -> Halfword {
-        debug_assert!(address as usize % Halfword::SIZE == 0);
+        debug_assert_eq!(address as usize % Halfword::SIZE, 0);
         let slice = &self.data[address as usize..][..Halfword::SIZE];
         Halfword::from_be_bytes(slice.try_into().unwrap())
     }
@@ -48,7 +48,7 @@ impl Memory {
     }
 
     pub fn write_opcode(&mut self, address: Address, opcode: Opcode) {
-        debug_assert!(address as usize % Instruction::SIZE == 0);
+        debug_assert_eq!(address as usize % Instruction::SIZE, 0);
         let instruction = opcode.as_instruction();
 
         self.data[address as usize..][..Instruction::SIZE]
@@ -56,12 +56,12 @@ impl Memory {
     }
 
     pub fn write_data(&mut self, address: Address, data: Word) {
-        debug_assert!(address as usize % Word::SIZE == 0);
+        debug_assert_eq!(address as usize % Word::SIZE, 0);
         self.data[address as usize..][..Word::SIZE].copy_from_slice(&data.to_be_bytes());
     }
 
     pub fn write_halfword(&mut self, address: Address, data: Halfword) {
-        debug_assert!(address as usize % Halfword::SIZE == 0);
+        debug_assert_eq!(address as usize % Halfword::SIZE, 0);
         self.data[address as usize..][..Halfword::SIZE].copy_from_slice(&data.to_be_bytes());
     }
 

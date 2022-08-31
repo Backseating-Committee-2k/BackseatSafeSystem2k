@@ -345,6 +345,10 @@ opcodes!(
     { MoveHalfwordAddressRegister, 0x0046, registers(Source R register), target_address; cycles = 1, Increment::Yes, "move the contents of register R into memory at address A (2 bytes)" },
     { MoveHalfwordTargetPointer, 0x0047, registers(Target T target, Source P pointer); cycles = 1, Increment::Yes, "move the contents addressed by the value of register P into register T (2 bytes)" },
     { MoveHalfwordPointerSource, 0x0048, registers(Target P pointer, Source S source); cycles = 1, Increment::Yes, "move the contents of register S into memory at address specified by register P (2 bytes)" },
+    // offset move-instructions
+    { MovePointerSourceOffset, 0x0049, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate" },
+    { MoveBytePointerSourceOffset, 0x004A, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate (1 byte)" },
+    { MoveHalfwordPointerSourceOffset, 0x004B, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate (2 bytes)" },
 
     // halt and catch fire
     { HaltAndCatchFire, 0x0006, registers(); cycles = 1, Increment::No, "halt and catch fire" },

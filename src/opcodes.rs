@@ -349,6 +349,9 @@ opcodes!(
     { MovePointerSourceOffset, 0x0049, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate" },
     { MoveBytePointerSourceOffset, 0x004A, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate (1 byte)" },
     { MoveHalfwordPointerSourceOffset, 0x004B, registers(Target P pointer, Source S source), immediate; cycles = 1, Increment::Yes, "move the value in register S into memory at address pointer + immediate (2 bytes)" },
+    { MoveTargetPointerOffset, 0x004C, registers(Target T target, Source P pointer), immediate; cycles = 1, Increment::Yes, "move the contents addressed by the sum of the pointer and the immediate into the register T" },
+    { MoveByteTargetPointerOffset, 0x004D, registers(Target T target, Source P pointer), immediate; cycles = 1, Increment::Yes, "move the contents addressed by the sum of the pointer and the immediate into the register T" },
+    { MoveHalfwordTargetPointerOffset, 0x004E, registers(Target T target, Source P pointer), immediate; cycles = 1, Increment::Yes, "move the contents addressed by the sum of the pointer and the immediate into the register T" },
 
     // halt and catch fire
     { HaltAndCatchFire, 0x0006, registers(); cycles = 1, Increment::No, "halt and catch fire" },

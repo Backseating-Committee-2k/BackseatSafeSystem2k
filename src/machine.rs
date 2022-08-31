@@ -535,6 +535,51 @@ mod tests {
     );
 
     create_test!(
+        move_from_memory_with_offset_into_register,
+        setup = {
+            let address = 0x1F0;
+            let offset = 12;
+            let pointer = 0x05.into();
+            let target = 0x04.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MoveTargetPointerOffset { target, pointer, immediate: offset }],
+        registers_pre = [address => pointer],
+        memory_pre = [value => address + offset],
+        registers_post = [(target, value)],
+    );
+
+    create_test!(
+        move_byte_from_memory_with_offset_into_register,
+        setup = {
+            let address = 0x1F0;
+            let offset = 12;
+            let pointer = 0x05.into();
+            let target = 0x04.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MoveByteTargetPointerOffset { target, pointer, immediate: offset }],
+        registers_pre = [address => pointer],
+        memory_pre = [value => address + offset],
+        registers_post = [(target, 0xAB)],
+    );
+
+    create_test!(
+        move_halfword_from_memory_with_offset_into_register,
+        setup = {
+            let address = 0x1F0;
+            let offset = 12;
+            let pointer = 0x05.into();
+            let target = 0x04.into();
+            let value = 0xABCD_1234;
+        },
+        opcodes = &[MoveHalfwordTargetPointerOffset { target, pointer, immediate: offset }],
+        registers_pre = [address => pointer],
+        memory_pre = [value => address + offset],
+        registers_post = [(target, 0xABCD)],
+    );
+
+    create_test!(
         halt_and_catch_fire_prevents_further_instructions,
         setup = {
             let register = 0x05.into();

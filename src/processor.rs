@@ -249,6 +249,31 @@ impl Processor {
                         self.registers[pointer] + immediate,
                         self.registers[source] as Halfword,
                     ),
+                    MoveTargetPointerOffset {
+                        target,
+                        pointer,
+                        immediate,
+                    } => {
+                        self.registers[target] =
+                            memory.read_data(self.registers[pointer] + immediate)
+                    }
+                    MoveByteTargetPointerOffset {
+                        target,
+                        pointer,
+                        immediate,
+                    } => {
+                        self.registers[target] =
+                            memory.read_byte(self.registers[pointer] + immediate).into()
+                    }
+                    MoveHalfwordTargetPointerOffset {
+                        target,
+                        pointer,
+                        immediate,
+                    } => {
+                        self.registers[target] = memory
+                            .read_halfword(self.registers[pointer] + immediate)
+                            .into()
+                    }
                     HaltAndCatchFire {} => {
                         println!("HALT AND CATCH FIRE!");
                         if self.exit_on_halt {

@@ -106,6 +106,7 @@ pub trait Size: Sized {
 impl Size for Instruction {}
 impl Size for Word {}
 impl Size for Halfword {}
+impl Size for Byte {}
 
 #[derive(clap::Subcommand, Debug)]
 enum Action {

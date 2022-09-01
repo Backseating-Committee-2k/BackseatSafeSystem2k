@@ -1475,6 +1475,37 @@ mod tests {
     }
 
     #[test]
+    fn push_and_pop_immediate() {
+        let machine = Machine::new(create_mock_periphery(), false);
+        let target_register = 0x06.into();
+        let data = 42;
+        assert_eq!(
+            machine.processor.get_stack_pointer(),
+            address_constants::STACK_START
+        );
+        let machine = execute_instruction_with_machine(machine, PushImmediate { immediate: data });
+        assert_eq!(
+            machine.processor.get_stack_pointer(),
+            address_constants::STACK_START + Word::SIZE as Address
+        );
+        assert_eq!(
+            machine.memory.read_data(address_constants::STACK_START),
+            data
+        );
+        let machine = execute_instruction_with_machine(
+            machine,
+            PopRegister {
+                register: target_register,
+            },
+        );
+        assert_eq!(
+            machine.processor.get_stack_pointer(),
+            address_constants::STACK_START
+        );
+        assert_eq!(machine.processor.registers[target_register], data);
+    }
+
+    #[test]
     fn push_and_pop_multiple_stack_values() {
         let values = [1, 4, 5, 42, 2, 3];
         let mut machine = Machine::new(create_mock_periphery(), false);

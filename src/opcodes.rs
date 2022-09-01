@@ -385,6 +385,7 @@ opcodes!(
 
     // stack instructions
     { PushRegister, 0x0015, registers(Source R register); cycles = 1, Increment::Yes, "pushes the value of register RR onto the stack" },
+    { PushImmediate, 0x004F, registers(), immediate; cycles = 1, Increment::Yes, "pushes the immediate value onto the stack" },
     { PopRegister, 0x0016, registers(Target R register); cycles = 1, Increment::Yes, "pops from the stack and stores the value in register RR" },
     { Pop, 0x0040, registers(); cycles = 1, Increment::Yes, "pops from the stack and discards the value" },
     { CallAddress, 0x0017, registers(), source_address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },

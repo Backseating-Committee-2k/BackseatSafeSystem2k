@@ -429,6 +429,9 @@ impl Processor {
                     PushRegister { register } => {
                         self.stack_push(memory, self.registers[register]);
                     }
+                    PushImmediate { immediate } => {
+                        self.stack_push(memory, immediate);
+                    }
                     PopRegister { register } => {
                         self.registers[register] = self.stack_pop(memory);
                     }

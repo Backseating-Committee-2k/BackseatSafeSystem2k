@@ -25,13 +25,13 @@ use std::{
 use address_constants::ENTRY_POINT;
 use clap::StructOpt;
 use cursor::Cursor;
-use display::{Display, DisplayImplementation, MockDisplay};
+use display::{Display, DisplayImplementation};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use memory::Memory;
 use num_format::{CustomFormat, ToFormattedString};
 use opcodes::Opcode;
-use periphery::Periphery;
+use periphery::PeripheryImplementation;
 use processor::Processor;
 use serde::{Deserialize, Serialize};
 use timer::Timer;
@@ -39,7 +39,11 @@ use timer::Timer;
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;
 
-use crate::{cursor::CursorMode, opcodes::OpcodeDescription, processor::Flag};
+use crate::{
+    cursor::CursorMode,
+    opcodes::OpcodeDescription,
+    processor::{Flag, NUM_REGISTERS},
+};
 
 pub struct Size2D {
     width: i32,
@@ -183,7 +187,7 @@ fn print_json(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
             ),
             (
                 "NUM_REGISTERS",
-                Constant::UnsignedInteger(Processor::NUM_REGISTERS as _),
+                Constant::UnsignedInteger(NUM_REGISTERS as _),
             ),
             ("FLAGS", Constant::Register(Processor::FLAGS.0.into())),
             (
@@ -351,7 +355,7 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
 
     #[cfg(feature = "graphics")]
     let raylib_handle_copy = Rc::clone(&raylib_handle);
-    let periphery = Periphery {
+    let periphery = PeripheryImplementation {
         timer: Timer::new(ms_since_epoch),
         keyboard: Keyboard::new(Box::new(move |key| {
             #[cfg(feature = "graphics")]
@@ -483,7 +487,7 @@ fn ms_since_epoch() -> u64 {
 
 fn execute_next_instruction<Display>(machine: &mut Machine<Display>)
 where
-    Display: crate::Display,
+    Display: crate::Display + 'static,
 {
     if !machine.is_halted() {
         machine.execute_next_instruction();

@@ -5,9 +5,9 @@ use crate::{
     cursor::{Cursor, CursorMode},
     display,
     memory::Memory,
-    periphery::Periphery,
-    processor::Processor,
-    terminal,
+    periphery::PeripheryImplementation,
+    processor::{InstructionCache, Processor},
+    terminal, Instruction, Size,
 };
 
 #[cfg(feature = "graphics")]
@@ -19,20 +19,24 @@ where
 {
     pub memory: Memory,
     pub processor: Processor,
-    pub periphery: Periphery<Display>,
+    pub periphery: PeripheryImplementation<Display>,
     is_halted: bool,
+    instruction_cache: InstructionCache<PeripheryImplementation<Display>>,
 }
 
 impl<Display> Machine<Display>
 where
-    Display: display::Display,
+    Display: display::Display + 'static,
 {
-    pub fn new(periphery: Periphery<Display>, exit_on_halt: bool) -> Self {
+    pub fn new(periphery: PeripheryImplementation<Display>, exit_on_halt: bool) -> Self {
+        let max_num_instructions = Memory::SIZE / Instruction::SIZE;
+        let cache = (0..max_num_instructions).map(|_| None).collect();
         Self {
             memory: Memory::new(),
             processor: Processor::new(exit_on_halt),
             periphery,
             is_halted: false,
+            instruction_cache: InstructionCache { cache },
         }
     }
 
@@ -71,10 +75,11 @@ where
 
     pub fn execute_next_instruction(&mut self) {
         use crate::processor::ExecutionResult::*;
-        if let Halted = self
-            .processor
-            .execute_next_instruction(&mut self.memory, &mut self.periphery)
-        {
+        if let Halted = self.processor.execute_next_instruction(
+            &mut self.memory,
+            &mut self.periphery,
+            &mut self.instruction_cache,
+        ) {
             self.is_halted = true;
         }
     }
@@ -90,7 +95,7 @@ mod tests {
     use std::time::Instant;
 
     use crate::cursor::Cursor;
-    use crate::display::{Display, MockDisplay};
+    use crate::display::MockDisplay;
     use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
     use crate::timer::Timer;
@@ -194,9 +199,11 @@ mod tests {
     ) -> Machine<MockDisplay> {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
-        machine
-            .processor
-            .execute_next_instruction(&mut machine.memory, &mut machine.periphery);
+        machine.processor.execute_next_instruction(
+            &mut machine.memory,
+            &mut machine.periphery,
+            &mut machine.instruction_cache,
+        );
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             instruction_pointer + Instruction::SIZE as u32
@@ -204,9 +211,9 @@ mod tests {
         machine
     }
 
-    fn create_mock_periphery() -> Periphery<MockDisplay> {
+    fn create_mock_periphery() -> PeripheryImplementation<MockDisplay> {
         let mut time = 0;
-        Periphery {
+        PeripheryImplementation {
             timer: Timer::new(move || {
                 let old_value = time;
                 time += 1;

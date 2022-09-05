@@ -16,7 +16,6 @@ pub trait Display {
     type Handle;
     type Thread;
 
-    fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self;
     fn swap(&mut self);
     fn is_first_framebuffer_visible(&self) -> bool;
 
@@ -35,15 +34,17 @@ pub struct MockDisplay {
     first_framebuffer_visible: bool,
 }
 
-impl Display for MockDisplay {
-    type Handle = ();
-    type Thread = ();
-
-    fn new(_: &mut Self::Handle, _: &Self::Thread) -> Self {
+impl MockDisplay {
+    pub fn new(_: &mut <Self as Display>::Handle, _: &<Self as Display>::Thread) -> Self {
         Self {
             first_framebuffer_visible: true,
         }
     }
+}
+
+impl Display for MockDisplay {
+    type Handle = ();
+    type Thread = ();
 
     fn swap(&mut self) {
         self.first_framebuffer_visible = !self.first_framebuffer_visible
@@ -67,11 +68,8 @@ pub struct DisplayImplementation {
 }
 
 #[cfg(feature = "graphics")]
-impl Display for DisplayImplementation {
-    type Handle = raylib::RaylibHandle;
-    type Thread = raylib::RaylibThread;
-
-    fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self {
+impl DisplayImplementation {
+    pub fn new(handle: &mut <Self as Display>::Handle, thread: &<Self as Display>::Thread) -> Self {
         let mut texture = handle
             .load_render_texture(thread, WIDTH as u32, HEIGHT as u32)
             .unwrap();
@@ -83,6 +81,12 @@ impl Display for DisplayImplementation {
             texture,
         }
     }
+}
+
+#[cfg(feature = "graphics")]
+impl Display for DisplayImplementation {
+    type Handle = raylib::RaylibHandle;
+    type Thread = raylib::RaylibThread;
 
     fn render(&mut self, memory: &mut Memory, handle: &mut RaylibDrawHandle) {
         let tint_color = raylib::ffi::Color {
@@ -119,14 +123,17 @@ impl Display for DisplayImplementation {
 
 #[cfg(not(feature = "graphics"))]
 impl Display for DisplayImplementation {
-    type Handle = ();
-    type Thread = ();
-
-    fn new(handle: &mut Self::Handle, thread: &Self::Thread) -> Self {
+    pub fn new(handle: &mut <Self as Display>::Handle, thread: &<Self as Display>::Thread) -> Self {
         DisplayImplementation {
             first_framebuffer_visible: true,
         }
     }
+}
+
+#[cfg(not(feature = "graphics"))]
+impl Display for DisplayImplementation {
+    type Handle = ();
+    type Thread = ();
 
     fn swap(&mut self) {
         self.first_framebuffer_visible = !self.first_framebuffer_visible;

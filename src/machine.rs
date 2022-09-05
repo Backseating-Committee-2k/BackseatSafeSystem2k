@@ -5,9 +5,9 @@ use crate::{
     cursor::{Cursor, CursorMode},
     display,
     memory::Memory,
-    periphery::Periphery,
-    processor::Processor,
-    terminal,
+    periphery::PeripheryImplementation,
+    processor::{CachedInstruction, ExecutionResult, InstructionCache, Processor},
+    terminal, Address, Instruction, Size,
 };
 
 #[cfg(feature = "graphics")]
@@ -19,21 +19,65 @@ where
 {
     pub memory: Memory,
     pub processor: Processor,
-    pub periphery: Periphery<Display>,
+    pub periphery: PeripheryImplementation<Display>,
     is_halted: bool,
+    instruction_cache: InstructionCache<PeripheryImplementation<Display>>,
 }
 
 impl<Display> Machine<Display>
 where
-    Display: display::Display,
+    Display: display::Display + 'static,
 {
-    pub fn new(periphery: Periphery<Display>, exit_on_halt: bool) -> Self {
+    pub fn new(periphery: PeripheryImplementation<Display>, exit_on_halt: bool) -> Self {
+        const MAX_NUM_INSTRUCTIONS: usize = Memory::SIZE / Instruction::SIZE;
+        let cache: Vec<_> = (0..MAX_NUM_INSTRUCTIONS)
+            .map(|_| {
+                Box::new(
+                    |_: &mut Processor,
+                     _: &mut Memory,
+                     _: &mut PeripheryImplementation<Display>| {
+                        ExecutionResult::Error
+                    },
+                ) as CachedInstruction<PeripheryImplementation<Display>>
+            })
+            .collect();
         Self {
             memory: Memory::new(),
             processor: Processor::new(exit_on_halt),
             periphery,
             is_halted: false,
+            instruction_cache: InstructionCache {
+                cache: cache
+                    .into_boxed_slice()
+                    .try_into()
+                    .unwrap_or_else(|_| unreachable!()),
+            },
         }
+    }
+
+    pub fn generate_instruction_cache(&mut self) {
+        const MAX_NUM_INSTRUCTIONS: usize = Memory::SIZE / Instruction::SIZE;
+        let cache: Vec<CachedInstruction<PeripheryImplementation<Display>>> = (0
+            ..MAX_NUM_INSTRUCTIONS)
+            .map(|i| {
+                let address = (i * Instruction::SIZE) as Address;
+                match self.memory.read_opcode(address) {
+                    Ok(opcode) => Processor::generate_cached_instruction(opcode),
+                    Err(_) => Box::new(
+                        |_: &mut Processor,
+                         _: &mut Memory,
+                         _: &mut PeripheryImplementation<Display>| {
+                            ExecutionResult::Error
+                        },
+                    ),
+                }
+            })
+            .collect();
+
+        self.instruction_cache.cache = cache
+            .into_boxed_slice()
+            .try_into()
+            .unwrap_or_else(|_| unreachable!());
     }
 
     fn update_cursor(&mut self) {
@@ -71,10 +115,11 @@ where
 
     pub fn execute_next_instruction(&mut self) {
         use crate::processor::ExecutionResult::*;
-        if let Halted = self
-            .processor
-            .execute_next_instruction(&mut self.memory, &mut self.periphery)
-        {
+        if let Halted = self.processor.execute_next_instruction(
+            &mut self.memory,
+            &mut self.periphery,
+            &mut self.instruction_cache,
+        ) {
             self.is_halted = true;
         }
     }
@@ -90,7 +135,7 @@ mod tests {
     use std::time::Instant;
 
     use crate::cursor::Cursor;
-    use crate::display::{Display, MockDisplay};
+    use crate::display::MockDisplay;
     use crate::keyboard::{KeyState, Keyboard};
     use crate::processor::Flag;
     use crate::timer::Timer;
@@ -184,6 +229,7 @@ mod tests {
             .zip((address_constants::ENTRY_POINT..).step_by(Instruction::SIZE))
         {
             machine.memory.write_opcode(address, opcode);
+            machine.generate_instruction_cache();
         }
         machine
     }
@@ -194,9 +240,12 @@ mod tests {
     ) -> Machine<MockDisplay> {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
-        machine
-            .processor
-            .execute_next_instruction(&mut machine.memory, &mut machine.periphery);
+        machine.generate_instruction_cache();
+        machine.processor.execute_next_instruction(
+            &mut machine.memory,
+            &mut machine.periphery,
+            &mut machine.instruction_cache,
+        );
         assert_eq!(
             machine.processor.registers[Processor::INSTRUCTION_POINTER],
             instruction_pointer + Instruction::SIZE as u32
@@ -204,9 +253,9 @@ mod tests {
         machine
     }
 
-    fn create_mock_periphery() -> Periphery<MockDisplay> {
+    fn create_mock_periphery() -> PeripheryImplementation<MockDisplay> {
         let mut time = 0;
-        Periphery {
+        PeripheryImplementation {
             timer: Timer::new(move || {
                 let old_value = time;
                 time += 1;
@@ -1558,6 +1607,7 @@ mod tests {
             call_address + Instruction::SIZE as Address,
             Opcode::Return {},
         );
+        machine.generate_instruction_cache();
 
         machine.execute_next_instruction(); // jump into subroutine
         assert_eq!(

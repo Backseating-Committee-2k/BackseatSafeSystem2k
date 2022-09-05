@@ -6,7 +6,7 @@ use crate::{
     display,
     memory::Memory,
     periphery::PeripheryImplementation,
-    processor::{InstructionCache, Processor},
+    processor::{CachedInstruction, InstructionCache, Processor},
     terminal, Instruction, Size,
 };
 
@@ -29,14 +29,20 @@ where
     Display: display::Display + 'static,
 {
     pub fn new(periphery: PeripheryImplementation<Display>, exit_on_halt: bool) -> Self {
-        let max_num_instructions = Memory::SIZE / Instruction::SIZE;
-        let cache = (0..max_num_instructions).map(|_| None).collect();
+        const MAX_NUM_INSTRUCTIONS: usize = Memory::SIZE / Instruction::SIZE;
+        let cache: Vec<Option<CachedInstruction<PeripheryImplementation<Display>>>> =
+            (0..MAX_NUM_INSTRUCTIONS).map(|_| None).collect();
         Self {
             memory: Memory::new(),
             processor: Processor::new(exit_on_halt),
             periphery,
             is_halted: false,
-            instruction_cache: InstructionCache { cache },
+            instruction_cache: InstructionCache {
+                cache: cache
+                    .into_boxed_slice()
+                    .try_into()
+                    .unwrap_or_else(|_| unreachable!()),
+            },
         }
     }
 

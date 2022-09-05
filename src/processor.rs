@@ -79,7 +79,8 @@ pub type CachedInstruction<ConcretePeriphery> =
     Box<dyn Fn(&mut Processor, &mut Memory, &mut ConcretePeriphery) -> ExecutionResult>;
 
 pub struct InstructionCache<ConcretePeriphery: Periphery> {
-    pub cache: Vec<Option<CachedInstruction<ConcretePeriphery>>>,
+    pub cache:
+        Box<[Option<CachedInstruction<ConcretePeriphery>>; Memory::SIZE / Instruction::SIZE]>,
 }
 
 pub struct Processor {

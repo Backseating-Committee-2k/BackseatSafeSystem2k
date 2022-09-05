@@ -122,7 +122,7 @@ impl Display for DisplayImplementation {
 }
 
 #[cfg(not(feature = "graphics"))]
-impl Display for DisplayImplementation {
+impl DisplayImplementation {
     pub fn new(handle: &mut <Self as Display>::Handle, thread: &<Self as Display>::Thread) -> Self {
         DisplayImplementation {
             first_framebuffer_visible: true,

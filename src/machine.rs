@@ -7,7 +7,7 @@ use crate::{
     memory::Memory,
     periphery::PeripheryImplementation,
     processor::{CachedInstruction, ExecutionResult, InstructionCache, Processor},
-    terminal, Instruction, Size,
+    terminal, Address, Instruction, Size,
 };
 
 #[cfg(feature = "graphics")]
@@ -55,11 +55,29 @@ where
         }
     }
 
-    pub fn set_instruction_cache(
-        &mut self,
-        instruction_cache: InstructionCache<PeripheryImplementation<Display>>,
-    ) {
-        self.instruction_cache = instruction_cache;
+    pub fn generate_instruction_cache(&mut self) {
+        const MAX_NUM_INSTRUCTIONS: usize = Memory::SIZE / Instruction::SIZE;
+        let cache: Vec<CachedInstruction<PeripheryImplementation<Display>>> = (0
+            ..MAX_NUM_INSTRUCTIONS)
+            .map(|i| {
+                let address = (i * Instruction::SIZE) as Address;
+                match self.memory.read_opcode(address) {
+                    Ok(opcode) => Processor::generate_cached_instruction(opcode),
+                    Err(_) => Box::new(
+                        |_: &mut Processor,
+                         _: &mut Memory,
+                         _: &mut PeripheryImplementation<Display>| {
+                            ExecutionResult::Error
+                        },
+                    ),
+                }
+            })
+            .collect();
+
+        self.instruction_cache.cache = cache
+            .into_boxed_slice()
+            .try_into()
+            .unwrap_or_else(|_| unreachable!());
     }
 
     fn update_cursor(&mut self) {
@@ -211,6 +229,7 @@ mod tests {
             .zip((address_constants::ENTRY_POINT..).step_by(Instruction::SIZE))
         {
             machine.memory.write_opcode(address, opcode);
+            machine.generate_instruction_cache();
         }
         machine
     }
@@ -221,6 +240,7 @@ mod tests {
     ) -> Machine<MockDisplay> {
         let instruction_pointer = machine.processor.registers[Processor::INSTRUCTION_POINTER];
         machine.memory.write_opcode(instruction_pointer, opcode);
+        machine.generate_instruction_cache();
         machine.processor.execute_next_instruction(
             &mut machine.memory,
             &mut machine.periphery,
@@ -1587,6 +1607,7 @@ mod tests {
             call_address + Instruction::SIZE as Address,
             Opcode::Return {},
         );
+        machine.generate_instruction_cache();
 
         machine.execute_next_instruction(); // jump into subroutine
         assert_eq!(

@@ -79,8 +79,7 @@ pub type CachedInstruction<ConcretePeriphery> =
     Box<dyn Fn(&mut Processor, &mut Memory, &mut ConcretePeriphery) -> ExecutionResult>;
 
 pub struct InstructionCache<ConcretePeriphery: Periphery> {
-    pub cache:
-        Box<[Option<CachedInstruction<ConcretePeriphery>>; Memory::SIZE / Instruction::SIZE]>,
+    pub cache: Box<[CachedInstruction<ConcretePeriphery>; Memory::SIZE / Instruction::SIZE]>,
 }
 
 pub struct Processor {
@@ -1384,23 +1383,7 @@ impl Processor {
     ) -> ExecutionResult {
         let instruction_address = self.get_instruction_pointer();
         let cache_index = instruction_address / Instruction::SIZE as Address;
-        match &instruction_cache.cache[cache_index as usize] {
-            Some(cached_instruction) => cached_instruction(self, memory, periphery),
-            None => match memory.read_opcode(instruction_address) {
-                Ok(opcode) => {
-                    let cached_instruction = Self::generate_cached_instruction(opcode);
-                    instruction_cache.cache[cache_index as usize] = Some(cached_instruction);
-                    eprint!(".");
-                    instruction_cache.cache[cache_index as usize]
-                        .as_ref()
-                        .unwrap()(self, memory, periphery)
-                }
-                Err(err) => {
-                    eprintln!("Error making tick: {}", err);
-                    ExecutionResult::Error
-                }
-            },
-        }
+        instruction_cache.cache[cache_index as usize](self, memory, periphery)
     }
 
     fn push_instruction_pointer(&mut self, memory: &mut Memory) {

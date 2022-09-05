@@ -6,7 +6,7 @@ use crate::{
     display,
     memory::Memory,
     periphery::PeripheryImplementation,
-    processor::{CachedInstruction, InstructionCache, Processor},
+    processor::{CachedInstruction, ExecutionResult, InstructionCache, Processor},
     terminal, Instruction, Size,
 };
 
@@ -30,8 +30,17 @@ where
 {
     pub fn new(periphery: PeripheryImplementation<Display>, exit_on_halt: bool) -> Self {
         const MAX_NUM_INSTRUCTIONS: usize = Memory::SIZE / Instruction::SIZE;
-        let cache: Vec<Option<CachedInstruction<PeripheryImplementation<Display>>>> =
-            (0..MAX_NUM_INSTRUCTIONS).map(|_| None).collect();
+        let cache: Vec<_> = (0..MAX_NUM_INSTRUCTIONS)
+            .map(|_| {
+                Box::new(
+                    |_: &mut Processor,
+                     _: &mut Memory,
+                     _: &mut PeripheryImplementation<Display>| {
+                        ExecutionResult::Error
+                    },
+                ) as CachedInstruction<PeripheryImplementation<Display>>
+            })
+            .collect();
         Self {
             memory: Memory::new(),
             processor: Processor::new(exit_on_halt),
@@ -44,6 +53,13 @@ where
                     .unwrap_or_else(|_| unreachable!()),
             },
         }
+    }
+
+    pub fn set_instruction_cache(
+        &mut self,
+        instruction_cache: InstructionCache<PeripheryImplementation<Display>>,
+    ) {
+        self.instruction_cache = instruction_cache;
     }
 
     fn update_cursor(&mut self) {

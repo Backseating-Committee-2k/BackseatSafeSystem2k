@@ -42,7 +42,7 @@ use raylib::prelude::*;
 use crate::{
     cursor::CursorMode,
     opcodes::OpcodeDescription,
-    processor::{Flag, NUM_REGISTERS},
+    processor::{CachedInstruction, ExecutionResult, Flag, InstructionCache, NUM_REGISTERS},
 };
 
 pub struct Size2D {
@@ -452,12 +452,44 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-fn load_rom(
-    machine: &mut Machine<impl display::Display>,
+fn load_rom<Display: display::Display + 'static>(
+    machine: &mut Machine<Display>,
     filename: impl AsRef<Path>,
 ) -> Result<(), Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
-    write_buffer(&buffer, machine)
+    write_buffer(&buffer, machine)?;
+    const MAX_NUM_INSTRUCTIONS: usize = Memory::SIZE / Instruction::SIZE;
+    let cache: Vec<CachedInstruction<PeripheryImplementation<Display>>> = (0..MAX_NUM_INSTRUCTIONS)
+        .map(|i| {
+            let address = (i * Instruction::SIZE) as Address;
+            match (address_constants::ENTRY_POINT
+                ..address_constants::ENTRY_POINT + buffer.len() as Address)
+                .contains(&address)
+            {
+                true => {
+                    let opcode = machine
+                        .memory
+                        .read_opcode(address)
+                        .expect("unable to evaluate opcode");
+                    Processor::generate_cached_instruction(opcode)
+                }
+                false => Box::new(
+                    |_: &mut Processor,
+                     _: &mut Memory,
+                     _: &mut PeripheryImplementation<Display>| {
+                        ExecutionResult::Error
+                    },
+                ),
+            }
+        })
+        .collect();
+    machine.set_instruction_cache(InstructionCache {
+        cache: cache
+            .into_boxed_slice()
+            .try_into()
+            .unwrap_or_else(|_| unreachable!()),
+    });
+    Ok(())
 }
 
 fn write_buffer(

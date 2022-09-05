@@ -388,6 +388,7 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
         Some(filename) => load_rom(&mut machine, filename)?,
         None => load_from_stdin(&mut machine)?,
     };
+    machine.generate_instruction_cache();
 
     #[cfg(feature = "graphics")]
     let font = raylib_handle
@@ -457,9 +458,7 @@ fn load_rom<Display: display::Display + 'static>(
     filename: impl AsRef<Path>,
 ) -> Result<(), Box<dyn Error>> {
     let buffer = std::fs::read(filename)?;
-    write_buffer(&buffer, machine)?;
-    machine.generate_instruction_cache();
-    Ok(())
+    write_buffer(&buffer, machine)
 }
 
 fn write_buffer(

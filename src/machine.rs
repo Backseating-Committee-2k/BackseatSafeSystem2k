@@ -61,9 +61,18 @@ where
             ..MAX_NUM_INSTRUCTIONS)
             .map(|i| {
                 let address = (i * Instruction::SIZE) as Address;
-                match self.memory.read_opcode(address) {
-                    Ok(opcode) => Processor::generate_cached_instruction(opcode),
-                    Err(_) => Box::new(
+                match address >= address_constants::ENTRY_POINT {
+                    true => match self.memory.read_opcode(address) {
+                        Ok(opcode) => Processor::generate_cached_instruction(opcode),
+                        Err(_) => Box::new(
+                            |_: &mut Processor,
+                             _: &mut Memory,
+                             _: &mut PeripheryImplementation<Display>| {
+                                ExecutionResult::Error
+                            },
+                        ),
+                    },
+                    false => Box::new(
                         |_: &mut Processor,
                          _: &mut Memory,
                          _: &mut PeripheryImplementation<Display>| {

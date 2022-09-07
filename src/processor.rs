@@ -1221,7 +1221,7 @@ impl Processor {
                 move |processor: &mut Processor,
                       _memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
-                    debug_assert_eq!(processor.registers[actual], processor.registers[expected]);
+                    assert_eq!(processor.registers[actual], processor.registers[expected]);
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal
                 },
@@ -1231,7 +1231,7 @@ impl Processor {
                 move |processor: &mut Processor,
                       _memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
-                    debug_assert_eq!(processor.registers[actual], immediate);
+                    assert_eq!(processor.registers[actual], immediate);
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal
                 },
@@ -1241,7 +1241,7 @@ impl Processor {
                 move |processor: &mut Processor,
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
-                    debug_assert_eq!(memory.read_data(processor.registers[pointer]), immediate);
+                    assert_eq!(memory.read_data(processor.registers[pointer]), immediate);
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal
                 },

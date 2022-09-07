@@ -1364,7 +1364,7 @@ impl Processor {
                     if immediate != processor.checkpoint_counter {
                         panic!(
                             "checkpoint counter mismatch: expected {}, got {}",
-                            immediate, processor.checkpoint_counter
+                            processor.checkpoint_counter, immediate
                         );
                     }
                     processor.checkpoint_counter += 1;

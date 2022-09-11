@@ -157,9 +157,6 @@ mod tests {
     use super::*;
 
     macro_rules! opcodes_to_machine {
-        () => {
-            Machine::new()
-        };
         ($opcodes:expr) => {
             create_machine_with_opcodes($opcodes)
         };

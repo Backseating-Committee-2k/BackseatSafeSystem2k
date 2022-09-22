@@ -124,12 +124,16 @@ where
 
     pub fn execute_next_instruction(&mut self) {
         use crate::processor::ExecutionResult::*;
-        if let Halted = self.processor.execute_next_instruction(
+        match self.processor.execute_next_instruction(
             &mut self.memory,
             &mut self.periphery,
             &mut self.instruction_cache,
         ) {
-            self.is_halted = true;
+            Error => panic!(),
+            Normal => {}
+            Halted => {
+                self.is_halted = true;
+            }
         }
     }
 

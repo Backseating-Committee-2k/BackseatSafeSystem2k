@@ -117,6 +117,8 @@ impl Size for Word {}
 impl Size for Halfword {}
 impl Size for Byte {}
 
+const DEFAULT_FONT_PATH: &str = "./resources/CozetteVector.ttf";
+
 #[derive(clap::Subcommand, Debug)]
 enum Action {
     /// Execute a ROM file (typically *.backseat)
@@ -144,6 +146,9 @@ enum Action {
     Debug {
         /// The path to the ROM file to be debugged
         path: Option<PathBuf>,
+        /// The path to the font file
+        #[clap(long)]
+        font_path: Option<String>,
     },
 }
 
@@ -151,6 +156,7 @@ struct RunOptions {
     exit_on_halt: bool,
     #[cfg(feature = "debugger")]
     debug: bool,
+    font_path: String,
 }
 
 impl RunOptions {
@@ -159,14 +165,16 @@ impl RunOptions {
             exit_on_halt,
             #[cfg(feature = "debugger")]
             debug: false,
+            font_path: DEFAULT_FONT_PATH.into(),
         }
     }
 
     #[cfg(feature = "debugger")]
-    fn new_debug() -> Self {
+    fn new_debug(font_path: Option<String>) -> Self {
         Self {
             exit_on_halt: true,
             debug: true,
+            font_path: font_path.unwrap_or(DEFAULT_FONT_PATH.into()),
         }
     }
 }
@@ -185,7 +193,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Action::Emit { path } => emit(path.as_deref()),
         Action::Json { path } => print_json(path.as_deref()),
         #[cfg(feature = "debugger")]
-        Action::Debug { path } => run(path.as_deref(), RunOptions::new_debug()),
+        Action::Debug { path, font_path } => run(path.as_deref(), RunOptions::new_debug(font_path)),
     }
 }
 
@@ -440,7 +448,7 @@ fn run(rom_filename: Option<&Path>, options: RunOptions) -> Result<(), Box<dyn E
     #[cfg(feature = "graphics")]
     let font = raylib_handle
         .borrow_mut()
-        .load_font(&raylib_thread, "./resources/CozetteVector.ttf")?;
+        .load_font(&raylib_thread, &options.font_path)?;
 
     let mut time_measurements = TimeMeasurements {
         next_render_time: ms_since_epoch(),

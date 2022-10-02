@@ -10,6 +10,9 @@ use crate::{
     terminal, Address, Instruction, Size,
 };
 
+#[cfg(feature = "debugger")]
+use crate::debugger::{BreakpointHandle, DebugHandle};
+
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;
 
@@ -22,6 +25,10 @@ where
     pub periphery: PeripheryImplementation<Display>,
     is_halted: bool,
     instruction_cache: InstructionCache<PeripheryImplementation<Display>>,
+    #[cfg(feature = "debugger")]
+    debug_handle: DebugHandle,
+    #[cfg(feature = "debugger")]
+    breakpoint_handle: BreakpointHandle,
 }
 
 impl<Display> Machine<Display>
@@ -41,17 +48,34 @@ where
                 ) as CachedInstruction<PeripheryImplementation<Display>>
             })
             .collect();
-        Self {
-            memory: Memory::new(),
-            processor: Processor::new(exit_on_halt),
-            periphery,
-            is_halted: false,
-            instruction_cache: InstructionCache {
-                cache: cache
-                    .into_boxed_slice()
-                    .try_into()
-                    .unwrap_or_else(|_| unreachable!()),
-            },
+        let instruction_cache = InstructionCache {
+            cache: cache
+                .into_boxed_slice()
+                .try_into()
+                .unwrap_or_else(|_| unreachable!()),
+        };
+
+        #[cfg(not(feature = "debugger"))]
+        {
+            Self {
+                memory: Memory::new(),
+                processor: Processor::new(exit_on_halt),
+                periphery,
+                is_halted: false,
+                instruction_cache,
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            Self {
+                memory: Memory::new(),
+                processor: Processor::new(exit_on_halt),
+                periphery,
+                is_halted: false,
+                instruction_cache,
+                debug_handle: DebugHandle::dummy(),
+                breakpoint_handle: BreakpointHandle::dummy(),
+            }
         }
     }
 
@@ -124,6 +148,11 @@ where
 
     pub fn execute_next_instruction(&mut self) {
         use crate::processor::ExecutionResult::*;
+
+        #[cfg(feature = "debugger")]
+        self.breakpoint_handle
+            .before_instruction_execution(self.processor.get_instruction_pointer());
+
         match self.processor.execute_next_instruction(
             &mut self.memory,
             &mut self.periphery,
@@ -140,6 +169,16 @@ where
     #[must_use = "Am I a joke to you?"]
     pub fn is_halted(&self) -> bool {
         self.is_halted
+    }
+
+    #[cfg(feature = "debugger")]
+    pub fn set_debug_handle(
+        &mut self,
+        debug_handle: DebugHandle,
+        breakpoint_handle: BreakpointHandle,
+    ) {
+        self.debug_handle = debug_handle;
+        self.breakpoint_handle = breakpoint_handle;
     }
 }
 

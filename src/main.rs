@@ -1,5 +1,7 @@
 mod address_constants;
 mod cursor;
+#[cfg(feature = "debugger")]
+mod debugger;
 mod display;
 mod dumper;
 mod keyboard;
@@ -25,7 +27,7 @@ use std::{
 use address_constants::ENTRY_POINT;
 use clap::StructOpt;
 use cursor::Cursor;
-use display::{Display, DisplayImplementation, MockDisplay};
+use display::{Display, DisplayImplementation};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use memory::Memory;
@@ -39,10 +41,13 @@ use timer::Timer;
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;
 
+#[cfg(not(feature = "graphics"))]
+use display::MockDisplay;
+
 use crate::{
     cursor::CursorMode,
     opcodes::OpcodeDescription,
-    processor::{CachedInstruction, ExecutionResult, Flag, InstructionCache, NUM_REGISTERS},
+    processor::{Flag, NUM_REGISTERS},
 };
 
 pub struct Size2D {
@@ -134,6 +139,36 @@ enum Action {
         /// Output path of the JSON file to be written
         path: Option<PathBuf>,
     },
+    #[cfg(feature = "debugger")]
+    /// Debugs a ROM file (typically *.backseat)
+    Debug {
+        /// The path to the ROM file to be debugged
+        path: Option<PathBuf>,
+    },
+}
+
+struct RunOptions {
+    exit_on_halt: bool,
+    #[cfg(feature = "debugger")]
+    debug: bool,
+}
+
+impl RunOptions {
+    fn new(exit_on_halt: bool) -> Self {
+        Self {
+            exit_on_halt,
+            #[cfg(feature = "debugger")]
+            debug: false,
+        }
+    }
+
+    #[cfg(feature = "debugger")]
+    fn new_debug() -> Self {
+        Self {
+            exit_on_halt: true,
+            debug: true,
+        }
+    }
 }
 
 /// The reference implementation of the backseat-safe-system-2k
@@ -146,9 +181,11 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     match args.action {
-        Action::Run { path, exit_on_halt } => run(path.as_deref(), exit_on_halt),
+        Action::Run { path, exit_on_halt } => run(path.as_deref(), RunOptions::new(exit_on_halt)),
         Action::Emit { path } => emit(path.as_deref()),
         Action::Json { path } => print_json(path.as_deref()),
+        #[cfg(feature = "debugger")]
+        Action::Debug { path } => run(path.as_deref(), RunOptions::new_debug()),
     }
 }
 
@@ -343,7 +380,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Error>> {
+fn run(rom_filename: Option<&Path>, options: RunOptions) -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "graphics")]
     let (raylib_handle, raylib_thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
@@ -382,7 +419,17 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
         },
     };
 
-    let mut machine = Machine::new(periphery, exit_on_halt);
+    let mut machine = Machine::new(periphery, options.exit_on_halt);
+
+    #[cfg(feature = "debugger")]
+    let (debug_handle, breakpoint_handle);
+    #[cfg(feature = "debugger")]
+    if options.debug {
+        (debug_handle, breakpoint_handle) = debugger::start_debugger();
+        machine.set_debug_handle(debug_handle.clone(), breakpoint_handle);
+    } else {
+        debug_handle = debugger::DebugHandle::dummy();
+    }
 
     match rom_filename {
         Some(filename) => load_rom(&mut machine, filename)?,
@@ -446,10 +493,18 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
             }
         };
 
+        // Update GUI after each cycle in debug mode.
+        #[cfg(feature = "debugger")]
+        let num_cycles = if options.debug { 1 } else { num_cycles };
+
         for _ in 0..num_cycles {
             execute_next_instruction(&mut machine);
         }
     }
+
+    #[cfg(feature = "debugger")]
+    debug_handle.stop();
+
     Ok(())
 }
 

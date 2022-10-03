@@ -16,7 +16,9 @@ const DEBUGGER_PORT_PREFIX: &str = "Debugger-Port:";
 
 #[derive(Debug, Deserialize)]
 pub enum Request {
-    StartExecution {},
+    StartExecution {
+        stop_on_entry: bool,
+    },
     SetBreakpoints {
         locations: Vec<Address>,
     },
@@ -33,6 +35,7 @@ pub enum Request {
 pub enum Response {
     HitBreakpoint { location: Address },
     Breaking { location: Address },
+    Pausing { location: Address },
 }
 
 pub struct TcpHandler {

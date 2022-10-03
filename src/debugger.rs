@@ -35,6 +35,7 @@ pub struct BreakpointHandle {
     sender: Option<Sender<DebugMessage>>,
     receiver: Option<Receiver<BreakpointMessage>>,
     receive_cache: VecDeque<BreakpointMessage>,
+    should_pause: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -53,6 +54,8 @@ enum DebugMessage {
     HitBreakpoint(Address),
     /// Notification that the debugger is (still) breaking at the given instruction address.
     Breaking(Address),
+    /// Notification that the debugger started breaking at the given instruction address due to a pause request.
+    Pausing(Address),
 }
 
 enum DebuggerCommand {
@@ -67,6 +70,8 @@ enum BreakpointMessage {
     Continue,
     /// Execute one instruction while breaking.
     StepOne,
+    /// Instructs breakpoint handler to break as soon as possible.
+    Pause,
 }
 
 pub fn start_debugger() -> (DebugHandle, BreakpointHandle) {
@@ -85,6 +90,7 @@ pub fn start_debugger() -> (DebugHandle, BreakpointHandle) {
             sender: Some(sender),
             receiver: Some(breakpoint_receiver),
             receive_cache: VecDeque::new(),
+            should_pause: false,
         },
     )
 }
@@ -116,6 +122,7 @@ impl BreakpointHandle {
             sender: None,
             receiver: None,
             receive_cache: VecDeque::with_capacity(0),
+            should_pause: false,
         }
     }
 
@@ -131,13 +138,19 @@ impl BreakpointHandle {
         self.receive_updates_non_blocking();
 
         let should_break = self.breakpoints.contains(&instruction_pointer);
-        if self.state != Breaking && should_break {
+        if self.state != Breaking && self.should_pause {
+            self.state = Breaking;
+            self.receive_cache.clear();
+            self.send(DebugMessage::Pausing(instruction_pointer));
+        } else if self.state != Breaking && should_break {
             self.state = Breaking;
             self.receive_cache.clear();
             self.send(DebugMessage::HitBreakpoint(instruction_pointer));
         } else if self.state == Breaking {
             self.send(DebugMessage::Breaking(instruction_pointer));
         }
+
+        self.should_pause = false;
 
         if self.state == Breaking {
             self.breaking();
@@ -165,7 +178,7 @@ impl BreakpointHandle {
                         self.state = BreakpointHandleState::Running;
                         return;
                     },
-                    SetBreakpoints(_) | RemoveBreakpoints(_) => panic!("BreakpointHandle: SetBreakpoints and RemoveBreakpoints should never be added to the message cache but handled immediately."),
+                    Pause | SetBreakpoints(_) | RemoveBreakpoints(_) => panic!("BreakpointHandle: Message should never be added to the message cache but handled immediately."),
                 }
             }
 
@@ -210,6 +223,9 @@ impl BreakpointHandle {
     #[inline]
     fn handle_message(&mut self, message: BreakpointMessage) {
         match message {
+            BreakpointMessage::Pause => {
+                self.should_pause = true;
+            }
             BreakpointMessage::SetBreakpoints(locations) => {
                 self.breakpoints.extend(locations);
             }
@@ -284,6 +300,10 @@ impl Debugger {
                 let message = tcp_protocol::Response::Breaking { location };
                 self.handle_tcp_result(tcp.send(&message));
             }
+            DebugMessage::Pausing(location) => {
+                let message = tcp_protocol::Response::Pausing { location };
+                self.handle_tcp_result(tcp.send(&message));
+            }
         }
     }
 
@@ -299,7 +319,10 @@ impl Debugger {
 
     fn handle_request(&mut self, request: tcp_protocol::Request) {
         match request {
-            tcp_protocol::Request::StartExecution {} => {
+            tcp_protocol::Request::StartExecution { stop_on_entry } => {
+                if stop_on_entry {
+                    self.send_to_breakpoint_handler(BreakpointMessage::Pause);
+                }
                 self.started = true;
                 self.start_notifications.clear(); // ==> notify all
             }

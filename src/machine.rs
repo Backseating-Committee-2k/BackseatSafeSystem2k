@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[cfg(feature = "debugger")]
-use crate::debugger::{BreakpointHandle, DebugHandle};
+use crate::debugger::DebugHandle;
 
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;
@@ -27,8 +27,6 @@ where
     instruction_cache: InstructionCache<PeripheryImplementation<Display>>,
     #[cfg(feature = "debugger")]
     debug_handle: DebugHandle,
-    #[cfg(feature = "debugger")]
-    breakpoint_handle: BreakpointHandle,
 }
 
 impl<Display> Machine<Display>
@@ -74,7 +72,6 @@ where
                 is_halted: false,
                 instruction_cache,
                 debug_handle: DebugHandle::dummy(),
-                breakpoint_handle: BreakpointHandle::dummy(),
             }
         }
     }
@@ -150,8 +147,8 @@ where
         use crate::processor::ExecutionResult::*;
 
         #[cfg(feature = "debugger")]
-        self.breakpoint_handle
-            .before_instruction_execution(self.processor.get_instruction_pointer());
+        self.debug_handle
+            .before_instruction_execution(&self.processor);
 
         match self.processor.execute_next_instruction(
             &mut self.memory,
@@ -172,13 +169,13 @@ where
     }
 
     #[cfg(feature = "debugger")]
-    pub fn set_debug_handle(
-        &mut self,
-        debug_handle: DebugHandle,
-        breakpoint_handle: BreakpointHandle,
-    ) {
-        self.debug_handle = debug_handle;
-        self.breakpoint_handle = breakpoint_handle;
+    pub fn start_debugger(&mut self) {
+        self.debug_handle = crate::debugger::start_debugger();
+    }
+
+    #[cfg(feature = "debugger")]
+    pub fn stop_debugger(&mut self) {
+        self.debug_handle.stop();
     }
 }
 

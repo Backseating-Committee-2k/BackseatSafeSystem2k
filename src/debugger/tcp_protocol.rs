@@ -7,7 +7,7 @@ use std::{
 use crossbeam_utils::Backoff;
 use serde::{Deserialize, Serialize};
 
-use crate::Address;
+use crate::{Address, Word};
 
 use super::segmented_reader::{self, Segment, SegmentedReader};
 
@@ -36,6 +36,7 @@ pub enum Response {
     HitBreakpoint { location: Address },
     Breaking { location: Address },
     Pausing { location: Address },
+    Registers { registers: Vec<Word> },
 }
 
 pub struct TcpHandler {

@@ -10,7 +10,7 @@ use std::{
 use crossbeam_channel::{bounded, select, tick, Receiver, Sender, TryRecvError};
 use crossbeam_utils::sync::WaitGroup;
 
-use crate::{debugger::tcp_protocol::TcpHandler, Address};
+use crate::{debugger::tcp_protocol::TcpHandler, processor::Processor, Address, Word};
 
 use self::tcp_protocol::PollReturn;
 
@@ -19,22 +19,17 @@ const TCP_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 struct Debugger {
     receiver: Receiver<DebugMessage>,
-    breakpoint_sender: Sender<BreakpointMessage>,
+    breakpoint_sender: Sender<DebugCommand>,
     started: bool,
     start_notifications: Vec<WaitGroup>,
 }
 
-#[derive(Clone)]
 pub struct DebugHandle {
-    sender: Option<Sender<DebugMessage>>,
-}
-
-pub struct BreakpointHandle {
     state: BreakpointHandleState,
     breakpoints: HashSet<Address>,
     sender: Option<Sender<DebugMessage>>,
-    receiver: Option<Receiver<BreakpointMessage>>,
-    receive_cache: VecDeque<BreakpointMessage>,
+    receiver: Option<Receiver<DebugCommand>>,
+    receive_cache: VecDeque<DebugCommand>,
     should_pause: bool,
 }
 
@@ -56,14 +51,11 @@ enum DebugMessage {
     Breaking(Address),
     /// Notification that the debugger started breaking at the given instruction address due to a pause request.
     Pausing(Address),
+    /// Notification that a register value changed. Also used to send initial register values of non-zero registers.
+    Registers(Vec<Word>),
 }
 
-enum DebuggerCommand {
-    TcpPoll,
-    HandleMessage(DebugMessage),
-}
-
-enum BreakpointMessage {
+enum DebugCommand {
     SetBreakpoints(Vec<Address>),
     RemoveBreakpoints(Vec<Address>),
     /// Continue normal execution i.e. stop breaking.
@@ -74,47 +66,23 @@ enum BreakpointMessage {
     Pause,
 }
 
-pub fn start_debugger() -> (DebugHandle, BreakpointHandle) {
+pub fn start_debugger() -> DebugHandle {
     let (sender, receiver) = bounded(CHANNEL_BOUND);
     let (breakpoint_sender, breakpoint_receiver) = bounded(CHANNEL_BOUND);
 
     thread::spawn(move || Debugger::new(receiver, breakpoint_sender).run());
 
-    (
-        DebugHandle {
-            sender: Some(sender.clone()),
-        },
-        BreakpointHandle {
-            state: BreakpointHandleState::WaitingForStart,
-            breakpoints: HashSet::new(),
-            sender: Some(sender),
-            receiver: Some(breakpoint_receiver),
-            receive_cache: VecDeque::new(),
-            should_pause: false,
-        },
-    )
+    DebugHandle {
+        state: BreakpointHandleState::WaitingForStart,
+        breakpoints: HashSet::new(),
+        sender: Some(sender),
+        receiver: Some(breakpoint_receiver),
+        receive_cache: VecDeque::new(),
+        should_pause: false,
+    }
 }
 
 impl DebugHandle {
-    pub fn dummy() -> Self {
-        Self { sender: None }
-    }
-
-    #[inline]
-    fn send(&self, message: DebugMessage) {
-        if let Some(sender) = &self.sender {
-            sender
-                .send(message)
-                .expect("Cannot send message to debug interface.");
-        }
-    }
-
-    pub fn stop(&self) {
-        self.send(DebugMessage::Stop);
-    }
-}
-
-impl BreakpointHandle {
     pub fn dummy() -> Self {
         Self {
             state: BreakpointHandleState::Running,
@@ -126,8 +94,14 @@ impl BreakpointHandle {
         }
     }
 
-    pub fn before_instruction_execution(&mut self, instruction_pointer: Address) {
+    pub fn stop(&self) {
+        self.send(DebugMessage::Stop);
+    }
+
+    pub fn before_instruction_execution(&mut self, processor: &Processor) {
         use BreakpointHandleState::*;
+
+        let instruction_pointer = processor.get_instruction_pointer();
 
         if self.state == WaitingForStart {
             self.wait_for_start();
@@ -135,22 +109,12 @@ impl BreakpointHandle {
             self.receive_cache.clear();
         }
 
-        self.receive_updates_non_blocking();
-
-        let should_break = self.breakpoints.contains(&instruction_pointer);
-        if self.state != Breaking && self.should_pause {
-            self.state = Breaking;
-            self.receive_cache.clear();
-            self.send(DebugMessage::Pausing(instruction_pointer));
-        } else if self.state != Breaking && should_break {
-            self.state = Breaking;
-            self.receive_cache.clear();
-            self.send(DebugMessage::HitBreakpoint(instruction_pointer));
-        } else if self.state == Breaking {
+        if self.state == Breaking {
+            self.send_registers(&processor.registers);
             self.send(DebugMessage::Breaking(instruction_pointer));
+        } else {
+            self.start_breaking_if_requested(instruction_pointer, processor);
         }
-
-        self.should_pause = false;
 
         if self.state == Breaking {
             self.breaking();
@@ -167,8 +131,37 @@ impl BreakpointHandle {
         }
     }
 
+    fn start_breaking_if_requested(&mut self, instruction_pointer: Word, processor: &Processor) {
+        use BreakpointHandleState::*;
+
+        if self.state == Breaking {
+            return;
+        }
+
+        self.receive_updates_non_blocking();
+
+        let mut should_start_breaking = None;
+        let hit_breakpoint = self.breakpoints.contains(&instruction_pointer);
+
+        if self.should_pause {
+            should_start_breaking = Some(DebugMessage::Pausing(instruction_pointer));
+        } else if hit_breakpoint {
+            should_start_breaking = Some(DebugMessage::HitBreakpoint(instruction_pointer));
+        }
+
+        self.should_pause = false;
+
+        if let Some(break_message) = should_start_breaking {
+            let registers = &processor.registers;
+            self.state = Breaking;
+            self.receive_cache.clear();
+            self.send_registers(registers);
+            self.send(break_message);
+        }
+    }
+
     fn breaking(&mut self) {
-        use BreakpointMessage::*;
+        use DebugCommand::*;
 
         loop {
             while let Some(message) = self.receive_cache.pop_front() {
@@ -184,6 +177,11 @@ impl BreakpointHandle {
 
             self.receive_update_blocking();
         }
+    }
+
+    #[inline]
+    fn send_registers<const SIZE: usize>(&self, registers: &crate::processor::Registers<SIZE>) {
+        self.send(DebugMessage::Registers(registers.contents().to_vec()));
     }
 
     #[inline]
@@ -221,15 +219,15 @@ impl BreakpointHandle {
     }
 
     #[inline]
-    fn handle_message(&mut self, message: BreakpointMessage) {
+    fn handle_message(&mut self, message: DebugCommand) {
         match message {
-            BreakpointMessage::Pause => {
+            DebugCommand::Pause => {
                 self.should_pause = true;
             }
-            BreakpointMessage::SetBreakpoints(locations) => {
+            DebugCommand::SetBreakpoints(locations) => {
                 self.breakpoints.extend(locations);
             }
-            BreakpointMessage::RemoveBreakpoints(locations) => {
+            DebugCommand::RemoveBreakpoints(locations) => {
                 for location in locations {
                     self.breakpoints.remove(&location);
                 }
@@ -240,7 +238,7 @@ impl BreakpointHandle {
 }
 
 impl Debugger {
-    fn new(receiver: Receiver<DebugMessage>, breakpoint_sender: Sender<BreakpointMessage>) -> Self {
+    fn new(receiver: Receiver<DebugMessage>, breakpoint_sender: Sender<DebugCommand>) -> Self {
         Self {
             receiver,
             breakpoint_sender,
@@ -250,23 +248,20 @@ impl Debugger {
     }
 
     fn run(mut self) {
-        use DebuggerCommand::*;
-
         let mut tcp = TcpHandler::start();
         let tcp_poll = tick(TCP_POLL_INTERVAL);
 
         loop {
-            let command = select! {
-                recv(tcp_poll) -> _ => TcpPoll,
-                recv(self.receiver) -> message =>
-                    HandleMessage(message.expect("Debugger cannot receive message on debug interface.")),
+            select! {
+                recv(tcp_poll) -> _ => self.handle_poll_result(tcp.poll()),
+                recv(self.receiver) -> message => {
+                    let message = message.expect("Debugger cannot receive message on debug interface.");
+                    if let DebugMessage::Stop = message {
+                        break;
+                    }
+                    self.handle_debug_message(message, &mut tcp)
+                }
             };
-
-            match command {
-                TcpPoll => self.handle_poll_result(tcp.poll()),
-                HandleMessage(DebugMessage::Stop) => break,
-                HandleMessage(message) => self.handle_debug_message(message, &mut tcp),
-            }
         }
     }
 
@@ -304,6 +299,10 @@ impl Debugger {
                 let message = tcp_protocol::Response::Pausing { location };
                 self.handle_tcp_result(tcp.send(&message));
             }
+            DebugMessage::Registers(registers) => {
+                let message = tcp_protocol::Response::Registers { registers };
+                self.handle_tcp_result(tcp.send(&message));
+            }
         }
     }
 
@@ -321,27 +320,27 @@ impl Debugger {
         match request {
             tcp_protocol::Request::StartExecution { stop_on_entry } => {
                 if stop_on_entry {
-                    self.send_to_breakpoint_handler(BreakpointMessage::Pause);
+                    self.send_to_breakpoint_handler(DebugCommand::Pause);
                 }
                 self.started = true;
                 self.start_notifications.clear(); // ==> notify all
             }
             tcp_protocol::Request::SetBreakpoints { locations } => {
-                self.send_to_breakpoint_handler(BreakpointMessage::SetBreakpoints(locations))
+                self.send_to_breakpoint_handler(DebugCommand::SetBreakpoints(locations))
             }
             tcp_protocol::Request::RemoveBreakpoints { locations } => {
-                self.send_to_breakpoint_handler(BreakpointMessage::RemoveBreakpoints(locations))
+                self.send_to_breakpoint_handler(DebugCommand::RemoveBreakpoints(locations))
             }
             tcp_protocol::Request::Continue {} => {
-                self.send_to_breakpoint_handler(BreakpointMessage::Continue)
+                self.send_to_breakpoint_handler(DebugCommand::Continue)
             }
             tcp_protocol::Request::StepOne {} => {
-                self.send_to_breakpoint_handler(BreakpointMessage::StepOne)
+                self.send_to_breakpoint_handler(DebugCommand::StepOne)
             }
         }
     }
 
-    fn send_to_breakpoint_handler(&mut self, message: BreakpointMessage) {
+    fn send_to_breakpoint_handler(&mut self, message: DebugCommand) {
         match self.breakpoint_sender.try_send(message) {
             Ok(_) | Err(crossbeam_channel::TrySendError::Full(_)) => {}
             Err(crossbeam_channel::TrySendError::Disconnected(_)) => {

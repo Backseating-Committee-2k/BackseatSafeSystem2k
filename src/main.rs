@@ -430,13 +430,8 @@ fn run(rom_filename: Option<&Path>, options: RunOptions) -> Result<(), Box<dyn E
     let mut machine = Machine::new(periphery, options.exit_on_halt);
 
     #[cfg(feature = "debugger")]
-    let (debug_handle, breakpoint_handle);
-    #[cfg(feature = "debugger")]
     if options.debug {
-        (debug_handle, breakpoint_handle) = debugger::start_debugger();
-        machine.set_debug_handle(debug_handle.clone(), breakpoint_handle);
-    } else {
-        debug_handle = debugger::DebugHandle::dummy();
+        machine.start_debugger();
     }
 
     match rom_filename {
@@ -511,7 +506,9 @@ fn run(rom_filename: Option<&Path>, options: RunOptions) -> Result<(), Box<dyn E
     }
 
     #[cfg(feature = "debugger")]
-    debug_handle.stop();
+    if options.debug {
+        machine.stop_debugger();
+    }
 
     Ok(())
 }

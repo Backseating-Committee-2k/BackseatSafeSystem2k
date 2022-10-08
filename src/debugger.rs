@@ -10,9 +10,8 @@ use std::{
 use crossbeam_channel::{bounded, select, tick, Receiver, Sender, TryRecvError};
 use crossbeam_utils::sync::WaitGroup;
 
-use crate::{debugger::tcp_protocol::TcpHandler, processor::Processor, Address, Word};
-
-use self::tcp_protocol::PollReturn;
+use self::tcp_protocol::{PollReturn, TcpHandler};
+use crate::{processor::Processor, Address, Register, Word};
 
 const CHANNEL_BOUND: usize = 100;
 const TCP_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -64,6 +63,7 @@ enum DebugCommand {
     StepOne,
     /// Instructs breakpoint handler to break as soon as possible.
     Pause,
+    SetRegister(u8, Word),
 }
 
 pub fn start_debugger() -> DebugHandle {
@@ -98,7 +98,7 @@ impl DebugHandle {
         self.send(DebugMessage::Stop);
     }
 
-    pub fn before_instruction_execution(&mut self, processor: &Processor) {
+    pub fn before_instruction_execution(&mut self, processor: &mut Processor) {
         use BreakpointHandleState::*;
 
         let instruction_pointer = processor.get_instruction_pointer();
@@ -117,7 +117,7 @@ impl DebugHandle {
         }
 
         if self.state == Breaking {
-            self.breaking();
+            self.breaking(processor);
         }
     }
 
@@ -160,7 +160,7 @@ impl DebugHandle {
         }
     }
 
-    fn breaking(&mut self) {
+    fn breaking(&mut self, processor: &mut Processor) {
         use DebugCommand::*;
 
         loop {
@@ -170,7 +170,10 @@ impl DebugHandle {
                     Continue => {
                         self.state = BreakpointHandleState::Running;
                         return;
-                    },
+                    }
+                    SetRegister(register, value) => {
+                        processor.registers[Register(register)] = value;
+                    }
                     Pause | SetBreakpoints(_) | RemoveBreakpoints(_) => panic!("BreakpointHandle: Message should never be added to the message cache but handled immediately."),
                 }
             }
@@ -336,6 +339,9 @@ impl Debugger {
             }
             tcp_protocol::Request::StepOne {} => {
                 self.send_to_breakpoint_handler(DebugCommand::StepOne)
+            }
+            tcp_protocol::Request::SetRegister { register, value } => {
+                self.send_to_breakpoint_handler(DebugCommand::SetRegister(register, value))
             }
         }
     }

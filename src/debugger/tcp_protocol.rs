@@ -29,6 +29,10 @@ pub enum Request {
     Continue {},
     /// Execute one instruction while breaking.
     StepOne {},
+    SetRegister {
+        register: u8,
+        value: Word,
+    },
 }
 
 #[derive(Debug, Serialize)]

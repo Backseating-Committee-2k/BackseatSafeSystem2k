@@ -38,6 +38,7 @@ pub enum Request {
 
 #[derive(Debug, Serialize)]
 pub enum Response {
+    Hello { pid: u32 },
     HitBreakpoint { location: Address },
     Breaking { location: Address },
     Pausing { location: Address },

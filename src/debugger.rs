@@ -264,7 +264,8 @@ impl Debugger {
         loop {
             select! {
                 recv(tcp_poll) -> _ => {
-                    let result = self.handle_poll_result(tcp.poll());
+                    let poll_result = tcp.poll();
+                    let result = self.handle_poll_result(&mut tcp, poll_result);
                     if let ShouldTerminate::Yes = result {
                         break;
                     }
@@ -280,13 +281,21 @@ impl Debugger {
         }
     }
 
-    fn handle_poll_result(&mut self, result: tcp_protocol::Result<PollReturn>) -> ShouldTerminate {
+    fn handle_poll_result(
+        &mut self,
+        tcp: &mut TcpHandler,
+        result: tcp_protocol::Result<PollReturn>,
+    ) -> ShouldTerminate {
         let mut should_terminate = ShouldTerminate::No;
 
         match result {
-            Ok(
-                PollReturn::Nothing | PollReturn::ClientConnected | PollReturn::ClientDisconnected,
-            ) => {}
+            Ok(PollReturn::Nothing | PollReturn::ClientDisconnected) => {}
+            Ok(PollReturn::ClientConnected) => {
+                let message = &tcp_protocol::Response::Hello {
+                    pid: std::process::id(),
+                };
+                self.handle_tcp_result(tcp.send(message));
+            }
             Ok(PollReturn::ReceivedRequests(requests)) => {
                 for request in requests {
                     if let tcp_protocol::Request::Terminate {} = request {

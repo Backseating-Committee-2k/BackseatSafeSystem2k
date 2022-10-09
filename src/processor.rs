@@ -57,6 +57,11 @@ pub struct Registers<const SIZE: usize>([Word; SIZE]);
 
 impl<const SIZE: usize> Registers<SIZE> {
     const _ASSERT_VALID_REGISTER_COUNT: () = assert!(SIZE - 1 < u8::MAX as usize);
+
+    #[cfg(feature = "debugger")]
+    pub fn contents(&self) -> &[Word; SIZE] {
+        &self.0
+    }
 }
 
 impl<const SIZE: usize> Index<Register> for Registers<SIZE> {

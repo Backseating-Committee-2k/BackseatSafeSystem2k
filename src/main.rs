@@ -1,5 +1,7 @@
 mod address_constants;
 mod cursor;
+#[cfg(feature = "debugger")]
+mod debugger;
 mod display;
 mod dumper;
 mod keyboard;
@@ -25,7 +27,7 @@ use std::{
 use address_constants::ENTRY_POINT;
 use clap::StructOpt;
 use cursor::Cursor;
-use display::{Display, DisplayImplementation, MockDisplay};
+use display::{Display, DisplayImplementation};
 use keyboard::{KeyState, Keyboard};
 use machine::Machine;
 use memory::Memory;
@@ -39,10 +41,13 @@ use timer::Timer;
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;
 
+#[cfg(not(feature = "graphics"))]
+use display::MockDisplay;
+
 use crate::{
     cursor::CursorMode,
     opcodes::OpcodeDescription,
-    processor::{CachedInstruction, ExecutionResult, Flag, InstructionCache, NUM_REGISTERS},
+    processor::{Flag, NUM_REGISTERS},
 };
 
 pub struct Size2D {
@@ -112,6 +117,8 @@ impl Size for Word {}
 impl Size for Halfword {}
 impl Size for Byte {}
 
+const DEFAULT_FONT_PATH: &str = "./resources/CozetteVector.ttf";
+
 #[derive(clap::Subcommand, Debug)]
 enum Action {
     /// Execute a ROM file (typically *.backseat)
@@ -134,6 +141,42 @@ enum Action {
         /// Output path of the JSON file to be written
         path: Option<PathBuf>,
     },
+    #[cfg(feature = "debugger")]
+    /// Debugs a ROM file (typically *.backseat)
+    Debug {
+        /// The path to the ROM file to be debugged
+        path: Option<PathBuf>,
+        /// The path to the font file
+        #[clap(long)]
+        font_path: Option<String>,
+    },
+}
+
+struct RunOptions {
+    exit_on_halt: bool,
+    #[cfg(feature = "debugger")]
+    debug: bool,
+    font_path: String,
+}
+
+impl RunOptions {
+    fn new(exit_on_halt: bool) -> Self {
+        Self {
+            exit_on_halt,
+            #[cfg(feature = "debugger")]
+            debug: false,
+            font_path: DEFAULT_FONT_PATH.into(),
+        }
+    }
+
+    #[cfg(feature = "debugger")]
+    fn new_debug(font_path: Option<String>) -> Self {
+        Self {
+            exit_on_halt: true,
+            debug: true,
+            font_path: font_path.unwrap_or(DEFAULT_FONT_PATH.into()),
+        }
+    }
 }
 
 /// The reference implementation of the backseat-safe-system-2k
@@ -146,9 +189,11 @@ struct Args {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     match args.action {
-        Action::Run { path, exit_on_halt } => run(path.as_deref(), exit_on_halt),
+        Action::Run { path, exit_on_halt } => run(path.as_deref(), RunOptions::new(exit_on_halt)),
         Action::Emit { path } => emit(path.as_deref()),
         Action::Json { path } => print_json(path.as_deref()),
+        #[cfg(feature = "debugger")]
+        Action::Debug { path, font_path } => run(path.as_deref(), RunOptions::new_debug(font_path)),
     }
 }
 
@@ -343,7 +388,7 @@ fn emit(output_filename: Option<&Path>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Error>> {
+fn run(rom_filename: Option<&Path>, options: RunOptions) -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "graphics")]
     let (raylib_handle, raylib_thread) = raylib::init()
         .size(SCREEN_SIZE.width, SCREEN_SIZE.height)
@@ -382,7 +427,12 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
         },
     };
 
-    let mut machine = Machine::new(periphery, exit_on_halt);
+    let mut machine = Machine::new(periphery, options.exit_on_halt);
+
+    #[cfg(feature = "debugger")]
+    if options.debug {
+        machine.start_debugger();
+    }
 
     match rom_filename {
         Some(filename) => load_rom(&mut machine, filename)?,
@@ -393,7 +443,7 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
     #[cfg(feature = "graphics")]
     let font = raylib_handle
         .borrow_mut()
-        .load_font(&raylib_thread, "./resources/CozetteVector.ttf")?;
+        .load_font(&raylib_thread, &options.font_path)?;
 
     let mut time_measurements = TimeMeasurements {
         next_render_time: ms_since_epoch(),
@@ -446,10 +496,20 @@ fn run(rom_filename: Option<&Path>, exit_on_halt: bool) -> Result<(), Box<dyn Er
             }
         };
 
+        // Update GUI after each cycle in debug mode.
+        #[cfg(feature = "debugger")]
+        let num_cycles = if options.debug { 1 } else { num_cycles };
+
         for _ in 0..num_cycles {
             execute_next_instruction(&mut machine);
         }
     }
+
+    #[cfg(feature = "debugger")]
+    if options.debug {
+        machine.stop_debugger();
+    }
+
     Ok(())
 }
 

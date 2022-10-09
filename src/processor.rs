@@ -737,9 +737,7 @@ impl Processor {
                     ExecutionResult::Normal
                 },
             ) as CachedInstruction<ConcretePeriphery>,
-            CallAddress {
-                source_address: address,
-            } => Box::new(
+            CallImmediate { immediate: address } => Box::new(
                 move |processor: &mut Processor,
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
@@ -748,7 +746,8 @@ impl Processor {
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal
                 },
-            ) as CachedInstruction<ConcretePeriphery>,
+            )
+                as CachedInstruction<ConcretePeriphery>,
             Return {} => Box::new(
                 move |processor: &mut Processor,
                       memory: &mut Memory,

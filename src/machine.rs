@@ -1636,8 +1636,8 @@ mod tests {
         let call_address = address_constants::ENTRY_POINT + 200 * Instruction::SIZE as Address;
         machine.memory.write_opcode(
             address_constants::ENTRY_POINT,
-            Opcode::CallAddress {
-                source_address: call_address,
+            Opcode::CallImmediate {
+                immediate: call_address,
             },
         );
         let target_register = Register(0xAB);

@@ -388,7 +388,7 @@ opcodes!(
     { PushImmediate, 0x004F, registers(), immediate; cycles = 1, Increment::Yes, "pushes the immediate value onto the stack" },
     { PopRegister, 0x0016, registers(Target R register); cycles = 1, Increment::Yes, "pops from the stack and stores the value in register RR" },
     { Pop, 0x0040, registers(); cycles = 1, Increment::Yes, "pops from the stack and discards the value" },
-    { CallAddress, 0x0017, registers(), source_address; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
+    { CallImmediate, 0x0017, registers(), immediate; cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the specified address" },
     { CallRegister, 0x0036, registers(Source R register); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in register R" },
     { CallPointer, 0x0037, registers(Source P pointer); cycles = 1, Increment::No, "push the current instruction pointer onto the stack and jump to the address stored in memory at the location specified by the value in register P" },
     { Return, 0x0018, registers(); cycles = 1, Increment::No, "pop the return address from the stack and jump to it" },

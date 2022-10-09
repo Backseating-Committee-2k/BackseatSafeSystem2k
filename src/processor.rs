@@ -364,7 +364,7 @@ impl Processor {
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
                     memory.write_data(
-                        processor.registers[pointer] + immediate,
+                        processor.registers[pointer].wrapping_add(immediate),
                         processor.registers[source],
                     );
                     handle_cycle_count_and_instruction_pointer(processor);
@@ -380,7 +380,7 @@ impl Processor {
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
                     memory.write_byte(
-                        processor.registers[pointer] + immediate,
+                        processor.registers[pointer].wrapping_add(immediate),
                         processor.registers[source] as Byte,
                     );
                     handle_cycle_count_and_instruction_pointer(processor);
@@ -396,7 +396,7 @@ impl Processor {
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
                     memory.write_halfword(
-                        processor.registers[pointer] + immediate,
+                        processor.registers[pointer].wrapping_add(immediate),
                         processor.registers[source] as Halfword,
                     );
                     handle_cycle_count_and_instruction_pointer(processor);
@@ -412,7 +412,7 @@ impl Processor {
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
                     processor.registers[target] =
-                        memory.read_data(processor.registers[pointer] + immediate);
+                        memory.read_data(processor.registers[pointer].wrapping_add(immediate));
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal
                 },
@@ -426,7 +426,7 @@ impl Processor {
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
                     processor.registers[target] = memory
-                        .read_byte(processor.registers[pointer] + immediate)
+                        .read_byte(processor.registers[pointer].wrapping_add(immediate))
                         .into();
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal
@@ -441,7 +441,7 @@ impl Processor {
                       memory: &mut Memory,
                       _periphery: &mut ConcretePeriphery| {
                     processor.registers[target] = memory
-                        .read_halfword(processor.registers[pointer] + immediate)
+                        .read_halfword(processor.registers[pointer].wrapping_add(immediate))
                         .into();
                     handle_cycle_count_and_instruction_pointer(processor);
                     ExecutionResult::Normal

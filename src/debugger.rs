@@ -11,7 +11,7 @@ use crossbeam_channel::{bounded, select, tick, Receiver, Sender, TryRecvError};
 use crossbeam_utils::sync::WaitGroup;
 
 use self::tcp_protocol::{PollReturn, TcpHandler};
-use crate::{processor::Processor, Address, Register, Word};
+use crate::{memory::Memory, opcodes::Opcode, processor::Processor, Address, Register, Word};
 
 const CHANNEL_BOUND: usize = 100;
 const TCP_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -30,6 +30,7 @@ pub struct DebugHandle {
     receiver: Option<Receiver<DebugCommand>>,
     receive_cache: VecDeque<DebugCommand>,
     should_pause: bool,
+    call_stack: Vec<Address>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,7 +52,10 @@ enum DebugMessage {
     /// Notification that the debugger started breaking at the given instruction address due to a pause request.
     Pausing(Address),
     /// Notification that a register value changed. Also used to send initial register values of non-zero registers.
-    Registers(Vec<Word>),
+    BreakState {
+        registers: Vec<Word>,
+        call_stack: Vec<Address>,
+    },
 }
 
 enum DebugCommand {
@@ -85,6 +89,7 @@ pub fn start_debugger() -> DebugHandle {
         receiver: Some(breakpoint_receiver),
         receive_cache: VecDeque::new(),
         should_pause: false,
+        call_stack: Vec::new(),
     }
 }
 
@@ -97,6 +102,7 @@ impl DebugHandle {
             receiver: None,
             receive_cache: VecDeque::with_capacity(0),
             should_pause: false,
+            call_stack: Vec::with_capacity(0),
         }
     }
 
@@ -104,7 +110,7 @@ impl DebugHandle {
         self.send(DebugMessage::Stop);
     }
 
-    pub fn before_instruction_execution(&mut self, processor: &mut Processor) {
+    pub fn before_instruction_execution(&mut self, processor: &mut Processor, memory: &mut Memory) {
         use BreakpointHandleState::*;
 
         let instruction_pointer = processor.get_instruction_pointer();
@@ -116,7 +122,7 @@ impl DebugHandle {
         }
 
         if self.state == Breaking {
-            self.send_registers(&processor.registers);
+            self.send_break_state(&processor.registers);
             self.send(DebugMessage::Breaking(instruction_pointer));
         } else {
             self.start_breaking_if_requested(instruction_pointer, processor);
@@ -125,6 +131,8 @@ impl DebugHandle {
         if self.state == Breaking {
             self.breaking(processor);
         }
+
+        self.track_call_stack(memory, instruction_pointer);
     }
 
     /// Wait for start command from debugger interface
@@ -158,10 +166,9 @@ impl DebugHandle {
         self.should_pause = false;
 
         if let Some(break_message) = should_start_breaking {
-            let registers = &processor.registers;
             self.state = Breaking;
             self.receive_cache.clear();
-            self.send_registers(registers);
+            self.send_break_state(&processor.registers);
             self.send(break_message);
         }
     }
@@ -190,8 +197,11 @@ impl DebugHandle {
     }
 
     #[inline]
-    fn send_registers<const SIZE: usize>(&self, registers: &crate::processor::Registers<SIZE>) {
-        self.send(DebugMessage::Registers(registers.contents().to_vec()));
+    fn send_break_state<const SIZE: usize>(&self, registers: &crate::processor::Registers<SIZE>) {
+        self.send(DebugMessage::BreakState {
+            registers: registers.contents().to_vec(),
+            call_stack: self.call_stack.clone(),
+        });
     }
 
     #[inline]
@@ -243,6 +253,21 @@ impl DebugHandle {
                 }
             }
             _ => self.receive_cache.push_back(message),
+        }
+    }
+
+    fn track_call_stack(&mut self, memory: &mut Memory, instruction_pointer: Address) {
+        let opcode = memory.read_opcode(instruction_pointer);
+        match opcode {
+            Ok(Opcode::CallImmediate { .. })
+            | Ok(Opcode::CallRegister { .. })
+            | Ok(Opcode::CallPointer { .. }) => {
+                self.call_stack.push(instruction_pointer);
+            }
+            Ok(Opcode::Return {}) => {
+                self.call_stack.pop();
+            }
+            _ => {}
         }
     }
 }
@@ -330,8 +355,14 @@ impl Debugger {
                 let message = tcp_protocol::Response::Pausing { location };
                 self.handle_tcp_result(tcp.send(&message));
             }
-            DebugMessage::Registers(registers) => {
-                let message = tcp_protocol::Response::Registers { registers };
+            DebugMessage::BreakState {
+                registers,
+                call_stack,
+            } => {
+                let message = tcp_protocol::Response::BreakState {
+                    registers,
+                    call_stack,
+                };
                 self.handle_tcp_result(tcp.send(&message));
             }
         }

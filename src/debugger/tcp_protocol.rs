@@ -33,10 +33,12 @@ pub enum Request {
         register: u8,
         value: Word,
     },
+    Terminate {},
 }
 
 #[derive(Debug, Serialize)]
 pub enum Response {
+    Hello { pid: u32 },
     HitBreakpoint { location: Address },
     Breaking { location: Address },
     Pausing { location: Address },

@@ -64,6 +64,12 @@ enum DebugCommand {
     /// Instructs breakpoint handler to break as soon as possible.
     Pause,
     SetRegister(u8, Word),
+    Terminate,
+}
+
+enum ShouldTerminate {
+    Yes,
+    No,
 }
 
 pub fn start_debugger() -> DebugHandle {
@@ -166,6 +172,7 @@ impl DebugHandle {
         loop {
             while let Some(message) = self.receive_cache.pop_front() {
                 match message {
+                    Terminate => std::process::exit(0),
                     StepOne => return,
                     Continue => {
                         self.state = BreakpointHandleState::Running;
@@ -256,7 +263,12 @@ impl Debugger {
 
         loop {
             select! {
-                recv(tcp_poll) -> _ => self.handle_poll_result(tcp.poll()),
+                recv(tcp_poll) -> _ => {
+                    let result = self.handle_poll_result(tcp.poll());
+                    if let ShouldTerminate::Yes = result {
+                        break;
+                    }
+                }
                 recv(self.receiver) -> message => {
                     let message = message.expect("Debugger cannot receive message on debug interface.");
                     if let DebugMessage::Stop = message {
@@ -268,18 +280,25 @@ impl Debugger {
         }
     }
 
-    fn handle_poll_result(&mut self, result: tcp_protocol::Result<PollReturn>) {
+    fn handle_poll_result(&mut self, result: tcp_protocol::Result<PollReturn>) -> ShouldTerminate {
+        let mut should_terminate = ShouldTerminate::No;
+
         match result {
             Ok(
                 PollReturn::Nothing | PollReturn::ClientConnected | PollReturn::ClientDisconnected,
             ) => {}
             Ok(PollReturn::ReceivedRequests(requests)) => {
                 for request in requests {
+                    if let tcp_protocol::Request::Terminate {} = request {
+                        should_terminate = ShouldTerminate::Yes;
+                    }
                     self.handle_request(request);
                 }
             }
             Err(_) => self.handle_tcp_result(result),
         }
+
+        should_terminate
     }
 
     fn handle_debug_message(&mut self, message: DebugMessage, tcp: &mut TcpHandler) {
@@ -342,6 +361,9 @@ impl Debugger {
             }
             tcp_protocol::Request::SetRegister { register, value } => {
                 self.send_to_breakpoint_handler(DebugCommand::SetRegister(register, value))
+            }
+            tcp_protocol::Request::Terminate {} => {
+                self.send_to_breakpoint_handler(DebugCommand::Terminate);
             }
         }
     }

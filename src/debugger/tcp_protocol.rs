@@ -33,6 +33,7 @@ pub enum Request {
         register: u8,
         value: Word,
     },
+    Terminate {},
 }
 
 #[derive(Debug, Serialize)]

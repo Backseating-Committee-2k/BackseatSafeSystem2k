@@ -148,7 +148,7 @@ where
 
         #[cfg(feature = "debugger")]
         self.debug_handle
-            .before_instruction_execution(&mut self.processor);
+            .before_instruction_execution(&mut self.processor, &mut self.memory);
 
         match self.processor.execute_next_instruction(
             &mut self.memory,

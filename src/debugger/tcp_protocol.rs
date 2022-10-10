@@ -38,11 +38,22 @@ pub enum Request {
 
 #[derive(Debug, Serialize)]
 pub enum Response {
-    Hello { pid: u32 },
-    HitBreakpoint { location: Address },
-    Breaking { location: Address },
-    Pausing { location: Address },
-    Registers { registers: Vec<Word> },
+    Hello {
+        pid: u32,
+    },
+    HitBreakpoint {
+        location: Address,
+    },
+    Breaking {
+        location: Address,
+    },
+    Pausing {
+        location: Address,
+    },
+    BreakState {
+        registers: Vec<Word>,
+        call_stack: Vec<Address>,
+    },
 }
 
 pub struct TcpHandler {

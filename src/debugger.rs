@@ -31,6 +31,13 @@ pub struct DebugHandle {
     receive_cache: VecDeque<DebugCommand>,
     should_pause: bool,
     call_stack: Vec<Address>,
+    did_execute_last_cycle: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ShouldExecuteInstruction {
+    Yes,
+    No,
 }
 
 #[derive(Debug, PartialEq)]
@@ -90,6 +97,7 @@ pub fn start_debugger() -> DebugHandle {
         receive_cache: VecDeque::new(),
         should_pause: false,
         call_stack: Vec::new(),
+        did_execute_last_cycle: true,
     }
 }
 
@@ -103,6 +111,7 @@ impl DebugHandle {
             receive_cache: VecDeque::with_capacity(0),
             should_pause: false,
             call_stack: Vec::with_capacity(0),
+            did_execute_last_cycle: true,
         }
     }
 
@@ -110,7 +119,11 @@ impl DebugHandle {
         self.send(DebugMessage::Stop);
     }
 
-    pub fn before_instruction_execution(&mut self, processor: &mut Processor, memory: &mut Memory) {
+    pub fn before_instruction_execution(
+        &mut self,
+        processor: &mut Processor,
+        memory: &mut Memory,
+    ) -> ShouldExecuteInstruction {
         use BreakpointHandleState::*;
 
         let instruction_pointer = processor.get_instruction_pointer();
@@ -122,17 +135,27 @@ impl DebugHandle {
         }
 
         if self.state == Breaking {
-            self.send_break_state(&processor.registers);
-            self.send(DebugMessage::Breaking(instruction_pointer));
+            if self.did_execute_last_cycle {
+                self.send_break_state(&processor.registers);
+                self.send(DebugMessage::Breaking(instruction_pointer));
+            }
         } else {
             self.start_breaking_if_requested(instruction_pointer, processor);
         }
 
+        let result;
         if self.state == Breaking {
-            self.breaking(processor);
+            result = self.breaking(processor);
+        } else {
+            result = ShouldExecuteInstruction::Yes
         }
 
-        self.track_call_stack(memory, instruction_pointer);
+        if let ShouldExecuteInstruction::Yes = result {
+            self.track_call_stack(memory, instruction_pointer);
+        }
+
+        self.did_execute_last_cycle = result == ShouldExecuteInstruction::Yes;
+        return result;
     }
 
     /// Wait for start command from debugger interface
@@ -173,27 +196,27 @@ impl DebugHandle {
         }
     }
 
-    fn breaking(&mut self, processor: &mut Processor) {
+    fn breaking(&mut self, processor: &mut Processor) -> ShouldExecuteInstruction {
         use DebugCommand::*;
 
-        loop {
-            while let Some(message) = self.receive_cache.pop_front() {
-                match message {
-                    Terminate => std::process::exit(0),
-                    StepOne => return,
-                    Continue => {
-                        self.state = BreakpointHandleState::Running;
-                        return;
-                    }
-                    SetRegister(register, value) => {
-                        processor.registers[Register(register)] = value;
-                    }
-                    Pause | SetBreakpoints(_) | RemoveBreakpoints(_) => panic!("BreakpointHandle: Message should never be added to the message cache but handled immediately."),
-                }
-            }
+        self.receive_updates_non_blocking();
 
-            self.receive_update_blocking();
+        if let Some(message) = self.receive_cache.pop_front() {
+            match message {
+                Terminate => std::process::exit(0),
+                StepOne => return ShouldExecuteInstruction::Yes,
+                Continue => {
+                    self.state = BreakpointHandleState::Running;
+                    return ShouldExecuteInstruction::Yes;
+                }
+                SetRegister(register, value) => {
+                    processor.registers[Register(register)] = value;
+                }
+                Pause | SetBreakpoints(_) | RemoveBreakpoints(_) => panic!("BreakpointHandle: Message should never be added to the message cache but handled immediately."),
+            }
         }
+
+        ShouldExecuteInstruction::No
     }
 
     #[inline]
@@ -222,17 +245,6 @@ impl DebugHandle {
                         panic!("Cannot receive breakpoint updates after debugger has been stopped.")
                     }
                     Err(TryRecvError::Empty) => break,
-                }
-            }
-        }
-    }
-
-    fn receive_update_blocking(&mut self) {
-        if let Some(ref receiver) = self.receiver {
-            match receiver.recv() {
-                Ok(message) => self.handle_message(message),
-                Err(_) => {
-                    panic!("Cannot receive breakpoint updates after debugger has been stopped.")
                 }
             }
         }

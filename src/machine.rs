@@ -3,6 +3,7 @@ use std::time::Instant;
 use crate::{
     address_constants,
     cursor::{Cursor, CursorMode},
+    debugger::ShouldExecuteInstruction,
     display,
     memory::Memory,
     periphery::PeripheryImplementation,
@@ -147,8 +148,14 @@ where
         use crate::processor::ExecutionResult::*;
 
         #[cfg(feature = "debugger")]
-        self.debug_handle
-            .before_instruction_execution(&mut self.processor, &mut self.memory);
+        {
+            let result = self
+                .debug_handle
+                .before_instruction_execution(&mut self.processor, &mut self.memory);
+            if let ShouldExecuteInstruction::No = result {
+                return;
+            }
+        }
 
         match self.processor.execute_next_instruction(
             &mut self.memory,

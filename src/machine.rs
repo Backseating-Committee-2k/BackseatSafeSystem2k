@@ -3,7 +3,6 @@ use std::time::Instant;
 use crate::{
     address_constants,
     cursor::{Cursor, CursorMode},
-    debugger::ShouldExecuteInstruction,
     display,
     memory::Memory,
     periphery::PeripheryImplementation,
@@ -12,7 +11,7 @@ use crate::{
 };
 
 #[cfg(feature = "debugger")]
-use crate::debugger::DebugHandle;
+use crate::debugger::{DebugHandle, ShouldExecuteInstruction};
 
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;

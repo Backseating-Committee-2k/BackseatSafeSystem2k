@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[cfg(feature = "debugger")]
-use crate::debugger::DebugHandle;
+use crate::debugger::{DebugHandle, ShouldExecuteInstruction};
 
 #[cfg(feature = "graphics")]
 use raylib::prelude::*;
@@ -147,8 +147,14 @@ where
         use crate::processor::ExecutionResult::*;
 
         #[cfg(feature = "debugger")]
-        self.debug_handle
-            .before_instruction_execution(&mut self.processor, &mut self.memory);
+        {
+            let result = self
+                .debug_handle
+                .before_instruction_execution(&mut self.processor, &mut self.memory);
+            if let ShouldExecuteInstruction::No = result {
+                return;
+            }
+        }
 
         match self.processor.execute_next_instruction(
             &mut self.memory,
